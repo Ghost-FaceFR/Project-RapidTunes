@@ -35,7 +35,9 @@ pub fn download_media(
             args.push("-x".to_string());
             args.push("--audio-format".to_string());
             args.push("mp3".to_string());
-            // Set audio quality: 0 = best, 9 = worst; or kbps for mp3
+            // yt-dlp's --audio-quality uses a 0-9 VBR scale (0 = best, 9 = worst)
+            // when used with libmp3lame. This does NOT directly map to kbps for CBR,
+            // but gives approximate quality: 0 ≈ 320kbps VBR, 5 ≈ 128kbps VBR.
             let audio_quality = match quality.as_str() {
                 "320kbps" => "0",
                 "128kbps" => "5",

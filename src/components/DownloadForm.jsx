@@ -79,8 +79,18 @@ function DownloadForm({ outputDir, onDownloadComplete }) {
       setStatusType("success");
       setCurrentFile("");
 
-      // Notify parent of the new download
-      const fileName = url.split("/").pop() || url;
+      // Extract a display label from the yt-dlp result or fall back to a timestamped entry.
+      // The result string from yt-dlp may contain the filename; use URL host as a readable label.
+      let fileName;
+      try {
+        const urlObj = new URL(url.trim());
+        // Use "hostname - query" or just hostname as the display name
+        fileName = urlObj.hostname + (urlObj.searchParams.get("v") ? ` (${urlObj.searchParams.get("v")})` : "");
+      } catch {
+        // If URL parsing fails, use a timestamped fallback
+        fileName = `download-${Date.now()}`;
+      }
+      fileName = `${fileName}.${format.toLowerCase()}`;
       onDownloadComplete(fileName, dir);
 
       // Reset after a short delay

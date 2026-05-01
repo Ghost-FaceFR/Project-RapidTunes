@@ -23,7 +23,7 @@ Before running RapidTunes, ensure the following tools are installed and availabl
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| [Rust](https://rustup.rs/) | Tauri backend | `curl https://sh.rustup.rs -sSf \| sh` |
+| [Rust](https://rustup.rs/) | Tauri backend | See [rustup.rs](https://rustup.rs/) |
 | [Node.js](https://nodejs.org/) (≥ 18) | Frontend build | [nodejs.org](https://nodejs.org/) |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Media downloading | `pip install yt-dlp` or see releases |
 | [ffmpeg](https://ffmpeg.org/) | Media conversion | `apt install ffmpeg` / `brew install ffmpeg` |

@@ -25,7 +25,8 @@ function Settings({ outputDir, setOutputDir }) {
         })
         .catch(console.error);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally run only once on mount to load the default directory
 
   // Open a native folder picker dialog (Tauri dialog plugin)
   const handleBrowse = async () => {
