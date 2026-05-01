@@ -1,0 +1,113 @@
+/* FileList.css - Styles for the downloaded files list component */
+
+.file-list {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.file-list.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+}
+
+.file-list-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 14px;
+}
+
+.file-list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+/* ─── File items list ─────────────────────────────────────────────────── */
+.file-list-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition), background var(--transition);
+  gap: 12px;
+}
+
+.file-list-item:hover {
+  border-color: rgba(233, 69, 96, 0.4);
+  background: rgba(233, 69, 96, 0.04);
+}
+
+/* File info section */
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.file-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.file-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.file-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Open folder button */
+.open-folder-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition), border-color var(--transition),
+    color var(--transition);
+  white-space: nowrap;
+}
+
+.open-folder-btn:hover {
+  background: rgba(233, 69, 96, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
