@@ -1,0 +1,69 @@
+/* ProgressBar.css - Styles for the download progress bar component */
+
+.progress-container {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Filename label */
+.progress-filename {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Track (background bar) */
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Fill (animated progress indicator) */
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #f07b8c);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer animation on the fill */
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Percentage text */
+.progress-percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: right;
+}
