@@ -1,0 +1,27 @@
+[package]
+name = "rapidtunes"
+version = "0.1.0"
+description = "Media downloader et converter"
+authors = ["RapidTunes Team"]
+edition = "2021"
+default-run = "rapidtunes"
+
+[lib]
+name = "rapidtunes"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = ["protocol-asset"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+regex = "1"
+tokio = { version = "1", features = ["process", "macros", "rt-multi-thread", "time"] }
+clap = { version = "4.5", features = ["derive"] }
+dirs = "5"
+rfd = "0.14"
+lofty = "0.22"
+base64 = "0.22"

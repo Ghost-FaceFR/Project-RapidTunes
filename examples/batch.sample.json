@@ -1,0 +1,20 @@
+{
+  "jobs": [
+    {
+      "url": "https://example.com/video-1",
+      "format": "mp3",
+      "quality": "320kbps",
+      "mode": "audio",
+      "output_dir": "C:/Users/you/Music",
+      "is_playlist": false
+    },
+    {
+      "url": "https://example.com/video-2",
+      "format": "mp4",
+      "quality": "720p",
+      "mode": "video",
+      "output_dir": "C:/Users/you/Videos",
+      "is_playlist": false
+    }
+  ]
+}
