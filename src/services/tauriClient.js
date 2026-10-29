@@ -44,3 +44,11 @@ export async function pickOutputDirectory() {
 export async function openFileLocation(path) {
   return invoke("open_file_location", { path });
 }
+
+export async function downloadUpdate(url, fileName) {
+  return invoke("download_update", { url, fileName });
+}
+
+export async function launchUpdate(path) {
+  return invoke("launch_update", { path });
+}

@@ -9,10 +9,13 @@ import {
   pauseActiveDownload,
   pickOutputDirectory,
   openFileLocation,
+  downloadUpdate,
+  launchUpdate,
   resumeActiveDownload,
   runSingleJob,
   subscribeToDownloadProgress
 } from "./services/tauriClient";
+import { checkForUpdate } from "./services/updateService";
 import { useMediaEngine } from "./services/mediaEngine";
 import {
   getMediaCover,
@@ -25,7 +28,7 @@ import {
 import MediaLibraryView from "./components/MediaLibraryView";
 import PlayerIcon from "./components/PlayerIcon";
 import TooltipLayer from "./components/TooltipLayer";
-import AudioVisualizer, { VISUALIZER_MODES } from "./components/AudioVisualizer";
+import AudioVisualizer, { VISUALIZER_MODES, VISUALIZER_COLORS } from "./components/AudioVisualizer";
 import { isValidUrl, validateJob } from "./utils/validators";
 import windowReduceIcon from "./assets/images/components/window_reduce.png";
 import windowMaximizeIcon from "./assets/images/components/window_maximize.png";
@@ -166,6 +169,8 @@ const DEFAULT_SETTINGS = {
   playerMiniAlwaysOnTop: true,
   playerShowCovers: true,
   playerVisualizer: "bars",
+  playerVisualizerColor: "theme",
+  playerVisualizerCustomColor: "#8b5cf6",
   playerRememberRecent: true
 };
 
@@ -911,6 +916,7 @@ export default function App() {
   const [errorRetryModal, setErrorRetryModal] = useState(null);
   const [globalErrorModal, setGlobalErrorModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updateState, setUpdateState] = useState({ status: "idle", info: null, message: "" });
   const [activeTopTab, setActiveTopTab] = useState("media-player");
   const [activeMainView, setActiveMainView] = useState("home");
   const [mediaDlMenuOpen, setMediaDlMenuOpen] = useState(false);
@@ -1724,6 +1730,57 @@ export default function App() {
       console.warn("Drag de fenêtre indisponible hors contexte Tauri:", err);
     }
   };
+
+  const handleCheckUpdate = async ({ silent = false } = {}) => {
+    setUpdateState((prev) => ({ ...prev, status: "checking", message: "" }));
+    try {
+      const info = await checkForUpdate(APP_VERSION);
+      if (info.available) {
+        setUpdateState({ status: "available", info, message: "" });
+      } else {
+        setUpdateState({
+          status: "uptodate",
+          info,
+          message: info.version ? "" : "Aucune version publiée pour le moment."
+        });
+      }
+    } catch (error) {
+      setUpdateState({
+        status: silent ? "idle" : "error",
+        info: null,
+        message: silent ? "" : `Vérification impossible : ${error?.message ?? error}`
+      });
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    const asset = updateState.info?.asset;
+    if (!asset) {
+      setUpdateState((prev) => ({ ...prev, status: "error", message: "Aucun installateur (.exe / .msi) dans cette version." }));
+      return;
+    }
+    setUpdateState((prev) => ({ ...prev, status: "downloading", message: "" }));
+    try {
+      const path = await downloadUpdate(asset.url, asset.name);
+      setUpdateState((prev) => ({ ...prev, status: "ready", message: "", path }));
+    } catch (error) {
+      setUpdateState((prev) => ({ ...prev, status: "error", message: String(error) }));
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    try {
+      await launchUpdate(updateState.path);
+    } catch (error) {
+      setUpdateState((prev) => ({ ...prev, status: "error", message: String(error) }));
+    }
+  };
+
+  useEffect(() => {
+    handleCheckUpdate({ silent: true });
+    // Vérification unique au démarrage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateSetting = (name, value) => {
     setSettings((prev) => ({
@@ -2945,6 +3002,41 @@ export default function App() {
                     <dd>© {new Date().getFullYear()} Ghost Face. Tous droits réservés.</dd>
                   </div>
                 </dl>
+                <div className="about-update" aria-live="polite">
+                  <p className="about-update__status">
+                    {updateState.status === "checking" && "Recherche de mises à jour..."}
+                    {updateState.status === "uptodate" &&
+                      (updateState.message || "RapidTunes est à jour.")}
+                    {updateState.status === "available" &&
+                      `Nouvelle version disponible : ${updateState.info.version} (actuelle : ${APP_VERSION})`}
+                    {updateState.status === "downloading" && "Téléchargement de la mise à jour..."}
+                    {updateState.status === "ready" && "Mise à jour téléchargée. Prête à être installée."}
+                    {updateState.status === "error" && updateState.message}
+                    {updateState.status === "idle" && "Vérifie si une nouvelle version est disponible."}
+                  </p>
+                  <div className="about-update__actions">
+                    {updateState.status === "available" ? (
+                      <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleDownloadUpdate}>
+                        Télécharger la mise à jour
+                      </button>
+                    ) : null}
+                    {updateState.status === "ready" ? (
+                      <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleInstallUpdate}>
+                        Installer et redémarrer
+                      </button>
+                    ) : null}
+                    {updateState.status !== "downloading" && updateState.status !== "ready" ? (
+                      <button
+                        type="button"
+                        className="about-update__btn"
+                        onClick={() => handleCheckUpdate()}
+                        disabled={updateState.status === "checking"}
+                      >
+                        Rechercher des mises à jour
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
               </section>
             ) : null}
 
@@ -3479,6 +3571,8 @@ export default function App() {
                       getAnalyser={engine.getAnalyser}
                       mode={visualizerMode}
                       isPlaying={isAudioPlaying}
+                      colorTheme={settings.playerVisualizerColor}
+                      customColor={settings.playerVisualizerCustomColor}
                     />
                   </div>
                 ) : null}
@@ -3952,6 +4046,29 @@ export default function App() {
                         ))}
                       </select>
                     </label>
+                    <label className="settings-field">
+                      <span>Couleur de la visualisation</span>
+                      <select
+                        value={settings.playerVisualizerColor}
+                        onChange={(event) => updateSetting("playerVisualizerColor", event.target.value)}
+                      >
+                        {VISUALIZER_COLORS.map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {settings.playerVisualizerColor === "custom" ? (
+                      <label className="settings-field">
+                        <span>Couleur personnalisée</span>
+                        <input
+                          type="color"
+                          value={settings.playerVisualizerCustomColor}
+                          onChange={(event) => updateSetting("playerVisualizerCustomColor", event.target.value)}
+                        />
+                      </label>
+                    ) : null}
                   </section>
                   {renderSettingToggle(
                     "playerShowCovers",

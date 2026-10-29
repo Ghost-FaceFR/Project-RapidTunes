@@ -7,6 +7,28 @@ export const VISUALIZER_MODES = [
   { id: "off", label: "Aucune" }
 ];
 
+export const VISUALIZER_COLORS = [
+  { id: "theme", label: "Thème de l'application", colors: null },
+  { id: "violet", label: "Violet", colors: ["#6d28d9", "#8b5cf6", "#c4b5fd"] },
+  { id: "ocean", label: "Océan", colors: ["#0369a1", "#06b6d4", "#a5f3fc"] },
+  { id: "forest", label: "Forêt", colors: ["#15803d", "#22c55e", "#bbf7d0"] },
+  { id: "fire", label: "Feu", colors: ["#b91c1c", "#f97316", "#fde047"] },
+  { id: "pink", label: "Rose", colors: ["#be185d", "#ec4899", "#fbcfe8"] },
+  { id: "rainbow", label: "Arc-en-ciel", colors: ["#ef4444", "#22c55e", "#3b82f6"] },
+  { id: "white", label: "Blanc", colors: ["#9ca3af", "#e5e7eb", "#ffffff"] },
+  { id: "custom", label: "Personnalisée", colors: null }
+];
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function shiftHex(hex, amount) {
+  const channels = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16));
+  const shifted = channels.map((value) =>
+    Math.round(amount >= 0 ? value + (255 - value) * amount : value * (1 + amount))
+  );
+  return `#${shifted.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
 function resolveCssColor(host, variable, fallback) {
   const probe = document.createElement("span");
   probe.style.color = `var(${variable})`;
@@ -21,7 +43,7 @@ function resolveCssColor(host, variable, fallback) {
  * Visualisation au rythme de la musique (barres, ondes, cercles) basée sur l'AnalyserNode
  * du moteur de lecture.
  */
-export default function AudioVisualizer({ getAnalyser, mode, isPlaying }) {
+export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorTheme = "theme", customColor = "#8b5cf6" }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -30,11 +52,20 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying }) {
     const context = canvas.getContext("2d");
     if (!context) return undefined;
 
-    const colors = {
-      a: resolveCssColor(canvas.parentElement ?? canvas, "--neon-1", "#9a9a9a"),
-      b: resolveCssColor(canvas.parentElement ?? canvas, "--neon-2", "#b0b0b0"),
-      c: resolveCssColor(canvas.parentElement ?? canvas, "--neon-3", "#d0d0d0")
-    };
+    const preset = VISUALIZER_COLORS.find((entry) => entry.id === colorTheme);
+    let colors;
+    if (colorTheme === "custom") {
+      const base = HEX_COLOR.test(customColor) ? customColor : "#8b5cf6";
+      colors = { a: shiftHex(base, -0.35), b: base, c: shiftHex(base, 0.55) };
+    } else if (preset?.colors) {
+      colors = { a: preset.colors[0], b: preset.colors[1], c: preset.colors[2] };
+    } else {
+      colors = {
+        a: resolveCssColor(canvas.parentElement ?? canvas, "--neon-1", "#9a9a9a"),
+        b: resolveCssColor(canvas.parentElement ?? canvas, "--neon-2", "#b0b0b0"),
+        c: resolveCssColor(canvas.parentElement ?? canvas, "--neon-3", "#d0d0d0")
+      };
+    }
 
     let width = 0;
     let height = 0;
@@ -160,7 +191,7 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying }) {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [getAnalyser, mode, isPlaying]);
+  }, [getAnalyser, mode, isPlaying, colorTheme, customColor]);
 
   if (mode === "off") return null;
   return <canvas ref={canvasRef} className="audio-visualizer" aria-hidden="true" />;

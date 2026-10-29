@@ -31,7 +31,9 @@ pub fn run() {
       commands::get_media_cover,
       commands::get_video_thumbnail,
       commands::update_media_tags,
-      commands::pick_media_files
+      commands::pick_media_files,
+      commands::download_update,
+      commands::launch_update
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -39,7 +39,12 @@ RapidTunes réunit deux outils dans une seule application :
 - Playlists, file de lecture, lecture aléatoire, vitesse de lecture
 - Panneau « Média sélectionné » avec pochette et propriétés
 - Édition des tags, mini lecteur (`Ctrl+M`), lecture plein écran
-- Égaliseur et visualisation audio
+- Égaliseur et visualisation audio (barres, ondes, cercles) avec couleur au choix : thème, palettes ou couleur personnalisée
+- Liste des morceaux avec en-têtes de colonnes (titre, artiste, album, genre, durée)
+
+### Mises à jour
+- Vérification automatique au démarrage via les *Releases* GitHub
+- Onglet « À propos » : recherche manuelle, téléchargement puis installation de la nouvelle version
 
 ### Interface
 - Thèmes personnalisables
@@ -117,6 +122,14 @@ src-tauri/
 examples/             Exemples de fichiers batch
 rapidtunes.bat        Lanceur Windows
 ```
+
+## Publier une mise à jour
+
+1. Augmenter la version dans `package.json`, `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`.
+2. Compiler : `rapidtunes.bat build`.
+3. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`) et y joindre l'installateur (`.exe` ou `.msi`).
+
+L'application compare le tag de la dernière release à sa version et propose la mise à jour si elle est plus récente.
 
 ## Notes techniques
 

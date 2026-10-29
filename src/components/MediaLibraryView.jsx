@@ -1251,15 +1251,38 @@ export default function MediaLibraryView({
   const renderTrackList = (list, extraFactory) => {
     if (list.length === 0) return <p className="mlv-empty">{emptyMessage}</p>;
     const keyOf = groupHeader(musicSort);
+    const header = (
+      <div className="mlv-row mlv-row--head" role="row">
+        <span />
+        <span />
+        <span />
+        <span className="mlv-row__title">Titre</span>
+        <span className="mlv-row__cell mlv-row__artist">Artiste</span>
+        <span className="mlv-row__cell mlv-row__album">Album</span>
+        <span className="mlv-row__cell mlv-row__genre">Genre</span>
+        <span className="mlv-row__duration">Durée</span>
+        <span />
+      </div>
+    );
     if (showingMusicTracks && keyOf) {
-      return groupConsecutive(list, keyOf).map((group) => (
-        <section key={group.key} className="mlv-group">
-          <h5>{group.key}</h5>
-          {group.items.map((item) => renderRow(item, list, extraFactory))}
-        </section>
-      ));
+      return (
+        <>
+          {header}
+          {groupConsecutive(list, keyOf).map((group) => (
+            <section key={group.key} className="mlv-group">
+              <h5>{group.key}</h5>
+              {group.items.map((item) => renderRow(item, list, extraFactory))}
+            </section>
+          ))}
+        </>
+      );
     }
-    return list.map((item) => renderRow(item, list, extraFactory));
+    return (
+      <>
+        {header}
+        {list.map((item) => renderRow(item, list, extraFactory))}
+      </>
+    );
   };
 
   const renderGroupedCards = (entries, unknownLabel, kind) =>

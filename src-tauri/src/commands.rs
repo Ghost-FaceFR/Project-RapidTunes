@@ -431,3 +431,79 @@ pub async fn pick_media_files(app: AppHandle) -> Result<Vec<LibraryItem>, String
   .await
   .map_err(|err| format!("Ouverture interrompue: {err}"))?
 }
+
+const UPDATE_URL_PREFIX: &str = "https://github.com/Ghost-FaceFR/Project-RapidTunes/";
+
+fn update_directory() -> std::path::PathBuf {
+  std::env::temp_dir().join("RapidTunes-update")
+}
+
+#[tauri::command]
+pub async fn download_update(url: String, file_name: String) -> Result<String, String> {
+  if !url.starts_with(UPDATE_URL_PREFIX) {
+    return Err("URL de mise à jour non autorisée.".to_string());
+  }
+
+  let safe_name = Path::new(&file_name)
+    .file_name()
+    .and_then(|name| name.to_str())
+    .filter(|name| !name.is_empty())
+    .ok_or_else(|| "Nom de fichier invalide.".to_string())?
+    .to_string();
+
+  let directory = update_directory();
+  std::fs::create_dir_all(&directory)
+    .map_err(|err| format!("Impossible de créer le dossier de mise à jour: {err}"))?;
+  let target = directory.join(&safe_name);
+
+  let mut command = Command::new("curl.exe");
+  command
+    .args(["-L", "--fail", "--silent", "--show-error", "-o"])
+    .arg(&target)
+    .arg(&url);
+  #[cfg(target_os = "windows")]
+  command.creation_flags(0x0800_0000);
+
+  let output = command
+    .output()
+    .await
+    .map_err(|err| format!("Téléchargement impossible: {err}"))?;
+  if !output.status.success() {
+    let _ = std::fs::remove_file(&target);
+    return Err(format!(
+      "Téléchargement impossible: {}",
+      String::from_utf8_lossy(&output.stderr).trim()
+    ));
+  }
+
+  Ok(target.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn launch_update(app: AppHandle, path: String) -> Result<(), String> {
+  let target = Path::new(&path)
+    .canonicalize()
+    .map_err(|_| "Le fichier de mise à jour est introuvable.".to_string())?;
+  let allowed = update_directory()
+    .canonicalize()
+    .map_err(|_| "Dossier de mise à jour introuvable.".to_string())?;
+  if !target.starts_with(&allowed) {
+    return Err("Fichier de mise à jour non autorisé.".to_string());
+  }
+
+  #[cfg(target_os = "windows")]
+  {
+    std::process::Command::new("cmd")
+      .args(["/C", "start", ""])
+      .arg(&target)
+      .spawn()
+      .map_err(|err| format!("Impossible de lancer la mise à jour: {err}"))?;
+  }
+  #[cfg(not(target_os = "windows"))]
+  {
+    return Err("Mise à jour automatique disponible uniquement sous Windows.".to_string());
+  }
+
+  app.exit(0);
+  Ok(())
+}

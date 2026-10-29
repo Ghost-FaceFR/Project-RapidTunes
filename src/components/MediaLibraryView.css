@@ -1759,3 +1759,32 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 }
+
+/* ===== En-têtes de colonnes de la liste ===== */
+.mlv-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 28px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--theme-line-2, #3a3a3a);
+  border-radius: 0;
+  background: var(--theme-bg-1, #101010);
+  color: var(--theme-text-3, #a7a7a7);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mlv-row--head:hover,
+.mlv-row--head:nth-child(even) {
+  background: var(--theme-bg-1, #101010);
+}
+
+.mlv-row--head .mlv-row__title,
+.mlv-row--head .mlv-row__cell,
+.mlv-row--head .mlv-row__duration {
+  color: inherit;
+  font-weight: inherit;
+}
