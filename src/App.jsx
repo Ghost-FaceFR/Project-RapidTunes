@@ -744,9 +744,35 @@ function QueuePlaceholderThumb({ isPlaylist = false, className = "queue-media-th
   );
 }
 
-function CustomSelect({ value, options, onChange, ariaLabel }) {
+/** Carte de paramètres repliable (repliée par défaut). */
+function CollapsibleBlock({ head, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className={`settings-block settings-collapsible ${open ? "" : "settings-collapsible--closed"}`}>
+      <button
+        type="button"
+        className="settings-collapsible__head settings-card-head"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span>{head}</span>
+        <span className="settings-collapsible__chevron">
+          <PlayerIcon name="chevron" />
+        </span>
+      </button>
+      {open ? children : null}
+    </section>
+  );
+}
+
+function CustomSelect({ value, options, onChange, ariaLabel, disabled = false }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  // Une option est soit une chaîne (affichée via formatDisplayValue), soit { value, label }.
+  const entries = options.map((option) =>
+    typeof option === "object" ? option : { value: option, label: formatDisplayValue(option) }
+  );
+  const current = entries.find((entry) => entry.value === value);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -760,6 +786,10 @@ function CustomSelect({ value, options, onChange, ariaLabel }) {
     return () => window.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   return (
     <div className={`custom-select-box ${open ? "open" : ""}`} ref={rootRef}>
       <button
@@ -767,24 +797,25 @@ function CustomSelect({ value, options, onChange, ariaLabel }) {
         className="custom-select-trigger"
         aria-label={ariaLabel}
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span>{formatDisplayValue(value)}</span>
+        <span>{current ? current.label : formatDisplayValue(value)}</span>
       </button>
 
       {open && (
         <ul className="custom-select-menu" role="listbox">
-          {options.map((option) => (
-            <li key={option}>
+          {entries.map((entry) => (
+            <li key={entry.value}>
               <button
                 type="button"
-                className={`custom-select-option ${option === value ? "active" : ""}`}
+                className={`custom-select-option ${entry.value === value ? "active" : ""}`}
                 onClick={() => {
-                  onChange(option);
+                  onChange(entry.value);
                   setOpen(false);
                 }}
               >
-                {formatDisplayValue(option)}
+                {entry.label}
               </button>
             </li>
           ))}
@@ -908,7 +939,8 @@ export default function App() {
   const [recentEntries, setRecentEntries] = useState(readRecents);
   const [openedRawItems, setOpenedRawItems] = useState([]);
   const skipRecentRef = useRef(null);
-  const [collapsedLibraryCards, setCollapsedLibraryCards] = useState({ music: false, video: false });
+  const [openReleases, setOpenReleases] = useState({});
+  const [collapsedLibraryCards, setCollapsedLibraryCards] = useState({ music: true, video: true });
   const [panelHostNode, setPanelHostNode] = useState(null);
   const [libraryRawItems, setLibraryRawItems] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
@@ -1357,6 +1389,8 @@ export default function App() {
     if (!canSubmitDownload) {
       if (trimmedUrl && isValidUrl(trimmedUrl)) {
         setError("Le lien doit être analysé avant de lancer le téléchargement.");
+      } else {
+        setError("Colle un lien ou choisis un résultat de recherche.");
       }
       return;
     }
@@ -3147,6 +3181,7 @@ export default function App() {
 
         <div className="window-content">
           <form
+            noValidate
             className={`converter-form ${activeTopTab === "media-dl" ? "converter-form--unified" : ""} ${activeTopTab === "media-player" ? "converter-form--player" : ""}`}
             onSubmit={handleFormSubmit}
           >
@@ -3266,24 +3301,11 @@ export default function App() {
               <section className="about-panel" aria-label="À propos de RapidTunes">
                 <div className="about-layout">
                 <div className="about-col about-col--info">
-                <h2 className="about-title">
-                  <img className="about-logo" src={appLogo} alt="" draggable="false" />
-                  RapidTunes
-                </h2>
-                <dl className="about-list">
-                  <div className="about-row">
-                    <dt>Version</dt>
-                    <dd>{APP_VERSION}</dd>
-                  </div>
-                  <div className="about-row">
-                    <dt>Développeur</dt>
-                    <dd>Ghost Face</dd>
-                  </div>
-                  <div className="about-row">
-                    <dt>Droits</dt>
-                    <dd>© {new Date().getFullYear()} Ghost Industry. Tous droits réservés.</dd>
-                  </div>
-                </dl>
+                <img className="about-logo" src={appLogo} alt="RapidTunes" draggable="false" />
+                <h2 className="about-title">RapidTunes</h2>
+                <p className="about-version">Version {APP_VERSION}</p>
+                <p className="about-credit">Développé par <strong>Ghost Face</strong></p>
+                <p className="about-copyright">© {new Date().getFullYear()} Ghost Industry. Tous droits réservés.</p>
                 {renderUpdatePanel()}
                 </div>
                 <div className="about-col about-col--changelog">
@@ -3300,7 +3322,16 @@ export default function App() {
                     <p className="changelog__empty">Aucune version publiée pour le moment.</p>
                   ) : null}
                   {changelog.releases.map((release) => (
-                    <article key={release.version} className="changelog__release">
+                    <article
+                      key={release.version}
+                      className={`changelog__release ${openReleases[release.version] ? "" : "changelog__release--closed"}`}
+                    >
+                      <button
+                        type="button"
+                        className="changelog__toggle"
+                        aria-expanded={Boolean(openReleases[release.version])}
+                        onClick={() => setOpenReleases((prev) => ({ ...prev, [release.version]: !prev[release.version] }))}
+                      >
                       <header className="changelog__head">
                         <strong>Version {release.version}</strong>
                         {release.version === APP_VERSION ? <span className="changelog__badge">Installée</span> : null}
@@ -3308,8 +3339,12 @@ export default function App() {
                         {release.date ? (
                           <time dateTime={release.date}>{new Date(release.date).toLocaleDateString("fr-FR")}</time>
                         ) : null}
+                        <span className="settings-collapsible__chevron" aria-hidden="true">
+                          <PlayerIcon name="chevron" />
+                        </span>
                       </header>
-                      {release.sections.length === 0 ? (
+                      </button>
+                      {!openReleases[release.version] ? null : release.sections.length === 0 ? (
                         <p className="changelog__empty">Aucune note pour cette version.</p>
                       ) : (
                         release.sections.map((section, index) => (
@@ -3844,16 +3879,16 @@ export default function App() {
 
               <label className="player-modal__preset">
                 <span>Prédéfini</span>
-                <select
+                <CustomSelect
                   value={eqPresetId}
-                  onChange={(event) => applyEqPreset(event.target.value)}
+                  ariaLabel="Prédéfini"
+                  options={[
+                    ...EQ_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+                    ...(eqPresetId === "custom" ? [{ value: "custom", label: "Personnalisé" }] : [])
+                  ]}
+                  onChange={applyEqPreset}
                   disabled={!isEqEnabled}
-                >
-                  {EQ_PRESETS.map((preset) => (
-                    <option key={preset.id} value={preset.id}>{preset.label}</option>
-                  ))}
-                  {eqPresetId === "custom" ? <option value="custom">Personnalisé</option> : null}
-                </select>
+                />
               </label>
 
               <div className={`eq-panel ${isEqEnabled ? "" : "eq-panel--disabled"}`}>
@@ -4147,11 +4182,14 @@ export default function App() {
                 </div>
               ) : activeSettingsTab === "appearance" ? (
                 <div className="settings-stack">
-                  <section className="settings-block">
-                    <div className="settings-card-head">
+                  <CollapsibleBlock
+                    head={
+                      <>
                       <h3>Thèmes</h3>
                       <p>Choisis le thème de l'application (fond dégradé et couleurs accordées).</p>
-                    </div>
+                      </>
+                    }
+                  >
                     <div className="theme-gradient-grid">
                       {THEME_OPTIONS.map((theme) => {
                         const active = resolvedTheme.theme.id === theme.id;
@@ -4169,7 +4207,7 @@ export default function App() {
                         );
                       })}
                     </div>
-                  </section>
+                                    </CollapsibleBlock>
                 </div>
               ) : activeSettingsTab === "player" ? (
                 <div className="settings-stack">
@@ -4290,16 +4328,12 @@ export default function App() {
                   <section className="settings-block">
                     <label className="settings-field">
                       <span>Langue / locale</span>
-                      <select
+                      <CustomSelect
                         value={historyDateLocale}
-                        onChange={(event) => updateSetting("languageLocale", event.target.value)}
-                      >
-                        {LANGUAGE_OPTIONS.map((entry) => (
-                          <option key={entry.value} value={entry.value}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
+                        ariaLabel="Langue / locale"
+                        options={LANGUAGE_OPTIONS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                        onChange={(next) => updateSetting("languageLocale", next)}
+                      />
                     </label>
                   </section>
 
@@ -4324,14 +4358,17 @@ export default function App() {
                 </div>
               ) : activeSettingsTab === "download" ? (
                 <div className="settings-stack">
-                  <section className="settings-block">
-                    <div className="settings-card-head">
+                  <CollapsibleBlock
+                    head={
+                      <>
                       <h3>Emplacement par défaut</h3>
                       <p>
                         Si vide, le logiciel demandera le dossier quand tu cliques sur
                         "Télécharger".
                       </p>
-                    </div>
+                      </>
+                    }
+                  >
 
                     <label className="settings-field">
                       <span>Dossier par défaut</span>
@@ -4370,48 +4407,45 @@ export default function App() {
                         </button>
                       </div>
                     </label>
-                  </section>
+                                    </CollapsibleBlock>
 
-                  <section className="settings-block">
-                    <div className="settings-card-head">
+                  <CollapsibleBlock
+                    head={
+                      <>
                       <h3>Valeurs par défaut</h3>
                       <p>Appliquées quand tu utilises le bouton dédié.</p>
-                    </div>
+                      </>
+                    }
+                  >
 
                     <div className="form-grid">
                       <label className="settings-field">
                         <span>Format par défaut</span>
-                        <select
+                        <CustomSelect
                           value={settings.defaultFormat}
-                          onChange={(event) => {
-                            const nextFormat = event.target.value;
+                          ariaLabel="Format par défaut"
+                          options={FORMAT_OPTIONS.map((option) => ({ value: option, label: option.toUpperCase() }))}
+                          onChange={(nextFormat) =>
                             setSettings((prev) => ({
                               ...prev,
                               defaultFormat: nextFormat,
                               defaultQuality: normalizeQualityForFormat(nextFormat, prev.defaultQuality)
-                            }));
-                          }}
-                        >
-                          {FORMAT_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option.toUpperCase()}
-                            </option>
-                          ))}
-                        </select>
+                            }))
+                          }
+                        />
                       </label>
 
                       <label className="settings-field">
                         <span>Qualité par défaut</span>
-                        <select
+                        <CustomSelect
                           value={normalizeQualityForFormat(settings.defaultFormat, settings.defaultQuality)}
-                          onChange={(event) => updateSetting("defaultQuality", event.target.value)}
-                        >
-                          {settingsQualityOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {formatQualityDisplayValue(settings.defaultFormat, option)}
-                            </option>
-                          ))}
-                        </select>
+                          ariaLabel="Qualité par défaut"
+                          options={settingsQualityOptions.map((option) => ({
+                            value: option,
+                            label: formatQualityDisplayValue(settings.defaultFormat, option)
+                          }))}
+                          onChange={(next) => updateSetting("defaultQuality", next)}
+                        />
                       </label>
                     </div>
 
@@ -4423,7 +4457,7 @@ export default function App() {
                         Réinitialiser
                       </button>
                     </div>
-                  </section>
+                                    </CollapsibleBlock>
 
                   <section className="settings-block">
                     <label className="settings-toggle-row settings-toggle-row--head">
@@ -4462,12 +4496,15 @@ export default function App() {
                 </div>
               ) : activeSettingsTab === "updates" ? (
                 <div className="settings-stack">
-                  <section className="settings-block">
-                    <div className="settings-card-head">
+                  <CollapsibleBlock
+                    head={
+                      <>
                       <h3>Version installée : {APP_VERSION}</h3>
-                    </div>
+                      </>
+                    }
+                  >
                     {renderUpdatePanel()}
-                  </section>
+                                    </CollapsibleBlock>
 
                   <section className="settings-block">
                     <label className="settings-toggle-row settings-toggle-row--head">

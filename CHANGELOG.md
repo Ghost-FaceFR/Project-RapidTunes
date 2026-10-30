@@ -1,5 +1,15 @@
 # Journal des modifications
 
+## 0.2.7 - 30 octobre 2026
+
+### Améliorations
+- Page « À propos » centrée : logo, nom, version, développeur et copyright, puis la mise à jour et le journal des modifications en dessous.
+- Les listes déroulantes natives de Windows (Paramètres, égaliseur) sont remplacées par les menus de l'application.
+- La bulle de validation native du navigateur (champ « Lien ou recherche » vide) est remplacée par une notification de l'application.
+- Journal des modifications : chaque version se déplie et se replie, repliées par défaut.
+- Paramètres : les cartes (thèmes, emplacements, valeurs par défaut, mises à jour) sont repliables et repliées par défaut.
+- Boutons radio des paramètres : plus de voile au survol.
+
 ## 0.2.6 - 30 octobre 2026
 
 ### Améliorations
