@@ -326,9 +326,11 @@ function readSavedWindowSize() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(WINDOW_SIZE_KEY) ?? "null");
     if (parsed && Number.isFinite(parsed.width) && Number.isFinite(parsed.height)) {
+      const maxWidth = Math.max(MIN_WINDOW_SIZE.width, window.screen?.availWidth || Infinity);
+      const maxHeight = Math.max(MIN_WINDOW_SIZE.height, window.screen?.availHeight || Infinity);
       return {
-        width: Math.max(MIN_WINDOW_SIZE.width, Math.round(parsed.width)),
-        height: Math.max(MIN_WINDOW_SIZE.height, Math.round(parsed.height))
+        width: Math.min(maxWidth, Math.max(MIN_WINDOW_SIZE.width, Math.round(parsed.width))),
+        height: Math.min(maxHeight, Math.max(MIN_WINDOW_SIZE.height, Math.round(parsed.height)))
       };
     }
   } catch {
@@ -1110,8 +1112,12 @@ export default function App() {
         await appWindow.setMinSize(new LogicalSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height));
         if (startupWindowSize) {
           await appWindow.setSize(new LogicalSize(startupWindowSize.width, startupWindowSize.height));
-          await appWindow.center();
         }
+        // Dans tous les cas la fenêtre est recentrée, affichée et au premier plan (jamais hors écran ni masquée).
+        await appWindow.center();
+        await appWindow.unminimize();
+        await appWindow.show();
+        await appWindow.setFocus();
       } catch (err) {
         console.warn("Impossible de restaurer la taille de la fenêtre:", err);
       } finally {
@@ -3252,6 +3258,8 @@ export default function App() {
 
             {activeTopTab === "about" ? (
               <section className="about-panel" aria-label="À propos de RapidTunes">
+                <div className="about-layout">
+                <div className="about-col about-col--info">
                 <h2>RapidTunes</h2>
                 <dl className="about-list">
                   <div className="about-row">
@@ -3260,7 +3268,7 @@ export default function App() {
                   </div>
                   <div className="about-row">
                     <dt>Développeur</dt>
-                    <dd>Ghost Industry</dd>
+                    <dd>Ghost Face</dd>
                   </div>
                   <div className="about-row">
                     <dt>Droits</dt>
@@ -3268,6 +3276,8 @@ export default function App() {
                   </div>
                 </dl>
                 {renderUpdatePanel()}
+                </div>
+                <div className="about-col about-col--changelog">
                 <div className="changelog" aria-live="polite">
                   <h3 className="changelog__title">Journal des modifications</h3>
                   {changelog.status === "loading" ? <p className="changelog__empty">Chargement...</p> : null}
@@ -3306,6 +3316,8 @@ export default function App() {
                       )}
                     </article>
                   ))}
+                </div>
+                </div>
                 </div>
               </section>
             ) : null}

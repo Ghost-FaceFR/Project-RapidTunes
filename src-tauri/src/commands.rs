@@ -142,11 +142,18 @@ pub fn get_default_video_dir() -> Option<String> {
   dirs::video_dir().map(|path| path.to_string_lossy().to_string())
 }
 
+/// Le sélecteur de dossier est modal: l'exécuter dans une commande synchrone bloquerait la boucle
+/// d'événements de la fenêtre (gel, voire plantage sur certaines machines). On le déporte sur un thread dédié.
 #[tauri::command]
-pub fn pick_output_directory() -> Option<String> {
-  rfd::FileDialog::new()
-    .pick_folder()
-    .map(|path| path.to_string_lossy().to_string())
+pub async fn pick_output_directory() -> Option<String> {
+  tokio::task::spawn_blocking(|| {
+    rfd::FileDialog::new()
+      .pick_folder()
+      .map(|path| path.to_string_lossy().to_string())
+  })
+  .await
+  .ok()
+  .flatten()
 }
 
 #[tauri::command]

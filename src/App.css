@@ -5816,3 +5816,107 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .toast { animation: none; }
 }
+
+/* ===== À propos: deux colonnes (infos à gauche, journal des modifications à droite) ===== */
+.about-panel {
+  overflow: hidden;
+}
+
+.about-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.about-col {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+}
+
+.about-col .about-list,
+.about-col .about-update,
+.about-col .changelog {
+  max-width: none;
+}
+
+.about-col .about-update,
+.about-col .changelog {
+  margin-top: 4px;
+}
+
+@media (max-width: 820px) {
+  .about-panel {
+    overflow-y: auto;
+  }
+
+  .about-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-col {
+    overflow: visible;
+  }
+}
+
+/* ===== Écran de secours si l'interface plante au démarrage ===== */
+.boot-error {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #111;
+  color: #f1f1f1;
+}
+
+.boot-error h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.boot-error p {
+  margin: 0;
+  color: #b9b9b9;
+  font-size: 0.85rem;
+}
+
+.boot-error pre {
+  margin: 0;
+  padding: 10px;
+  max-width: 720px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #171717;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+}
+
+.boot-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boot-error__actions button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #1f1f1f;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.boot-error__actions button:hover {
+  background: #272727;
+}

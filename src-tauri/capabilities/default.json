@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Accès principal pour la fenêtre de l'application RapidTunes.",
-  "windows": ["*"],
+  "windows": [
+    "*"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -19,6 +21,9 @@
     "core:window:allow-is-maximized",
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
-    "core:window:allow-center"
+    "core:window:allow-center",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-focus"
   ]
 }

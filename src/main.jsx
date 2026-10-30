@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import ErrorBoundary from "./components/ErrorBoundary";
 import "./App.css";
 
 // Désactive le menu contextuel natif du navigateur (les menus maison restent gérés par React).
@@ -9,6 +10,8 @@ window.addEventListener("contextmenu", (event) => event.preventDefault(), true);
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

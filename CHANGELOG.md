@@ -1,5 +1,17 @@
 # Journal des modifications
 
+## 0.2.1 - 30 octobre 2026
+
+### Corrections
+- Le choix d'un dossier (téléchargements, bibliothèques) ne bloque plus la fenêtre et ne peut plus la faire planter sur certains PC.
+- L'application s'affiche toujours : la fenêtre est recentrée, remise au premier plan et sa taille sauvegardée ne peut plus dépasser l'écran.
+- Si l'interface plante au démarrage, un écran de secours s'affiche avec un bouton pour réinitialiser les données au lieu d'une fenêtre vide.
+- Les plantages internes sont enregistrés dans `%LOCALAPPDATA%\RapidTunes\logs\crash.log` pour faciliter le diagnostic.
+
+### Améliorations
+- Page « À propos » en deux colonnes : informations et mise à jour à gauche, journal des modifications à droite.
+- Page « À propos » : le développeur est de nouveau indiqué « Ghost Face » (la société reste Ghost Industry).
+
 ## 0.2.0 - 30 octobre 2026
 
 ### Nouveautés

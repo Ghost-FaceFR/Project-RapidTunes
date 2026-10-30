@@ -14,6 +14,7 @@ pub struct DownloadControlState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  install_panic_log();
   tauri::Builder::default()
     .manage(DownloadControlState::default())
     .invoke_handler(tauri::generate_handler![
@@ -40,4 +41,23 @@ pub fn run() {
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
+}
+
+/// Écrit les plantages Rust dans %LOCALAPPDATA%\\RapidTunes\\logs\\crash.log pour pouvoir les diagnostiquer.
+fn install_panic_log() {
+  let default_hook = std::panic::take_hook();
+  std::panic::set_hook(Box::new(move |info| {
+    if let Ok(base) = std::env::var("LOCALAPPDATA") {
+      let dir = std::path::Path::new(&base).join("RapidTunes").join("logs");
+      if std::fs::create_dir_all(&dir).is_ok() {
+        let line = format!("[{}] {info}\n", env!("CARGO_PKG_VERSION"));
+        let _ = std::fs::OpenOptions::new()
+          .create(true)
+          .append(true)
+          .open(dir.join("crash.log"))
+          .and_then(|mut file| std::io::Write::write_all(&mut file, line.as_bytes()));
+      }
+    }
+    default_hook(info);
+  }));
 }
