@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.2.6 - 30 octobre 2026
+
+### Améliorations
+- Logo mis à jour (icône de l'application, de l'installateur et page « À propos »).
+
 ## 0.2.5 - 30 octobre 2026
 
 ### Améliorations
