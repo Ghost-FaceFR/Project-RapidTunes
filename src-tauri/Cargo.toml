@@ -1,6 +1,6 @@
 [package]
 name = "rapidtunes"
-version = "0.1.0"
+version = "0.2.0"
 description = "Media downloader et converter"
 authors = ["RapidTunes Team"]
 edition = "2021"
@@ -25,3 +25,10 @@ dirs = "5"
 rfd = "0.14"
 lofty = "0.22"
 base64 = "0.22"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

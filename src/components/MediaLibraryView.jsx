@@ -179,6 +179,7 @@ function Check({ checked, onToggle, label }) {
       role="checkbox"
       aria-checked={checked}
       aria-label={label}
+      title={label}
       className={`mlv-check ${checked ? "is-checked" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
@@ -648,7 +649,7 @@ function MediaCard({
   );
 }
 
-function MediaDetailsPanel({ item, showVideo, setPanelHost, onToggleFullscreen, onPlay }) {
+function MediaDetailsPanel({ item, showVideo, setPanelHost, onToggleFullscreen }) {
   if (!item) {
     return (
       <aside className="mlv-panel" aria-label="Média sélectionné">
@@ -684,8 +685,9 @@ function MediaDetailsPanel({ item, showVideo, setPanelHost, onToggleFullscreen, 
 
       <div className="mlv-panel__meta">
         <strong title={item.title}>{item.title}</strong>
-        <span>{item.artist}</span>
-        <span>{item.album}</span>
+        {/* Une vidéo sans tags n'a ni artiste ni album ; un clip musical en mp4 garde les siens. */}
+        {item.type === "video" && item.artist === UNKNOWN_ARTIST ? null : <span>{item.artist}</span>}
+        {item.type === "video" && item.album === UNKNOWN_ALBUM ? null : <span>{item.album}</span>}
       </div>
 
       <dl className="mlv-panel__facts">
@@ -694,11 +696,6 @@ function MediaDetailsPanel({ item, showVideo, setPanelHost, onToggleFullscreen, 
         {item.bitrateKbps ? <div><dt>Débit</dt><dd>{item.bitrateKbps} kb/s</dd></div> : null}
         <div><dt>Taille</dt><dd>{formatBytes(item.sizeBytes)}</dd></div>
       </dl>
-
-      <button type="button" className="mlv-btn mlv-btn--primary" onClick={onPlay}>
-        <PlayerIcon name="play" />
-        <span>Lire</span>
-      </button>
     </aside>
   );
 }
@@ -738,7 +735,8 @@ export default function MediaLibraryView({
   setPanelHost,
   showPanelVideo,
   onToggleFullscreen,
-  visualizer
+  visualizer,
+  onNotify
 }) {
   const [view, setView] = useState("home");
   const [musicTab, setMusicTab] = useState("tracks");
@@ -876,7 +874,8 @@ export default function MediaLibraryView({
         if (!item) return;
         cards.push({
           ...entry,
-          shape: item.type === "video" ? "video" : "square",
+          // Même format carré que la musique pour que les cartes de l'accueil restent alignées.
+          shape: "square",
           title: item.title,
           subtitle: item.type === "video" ? formatVideoDuration(item.durationSeconds) : item.artist,
           item,
@@ -1086,6 +1085,11 @@ export default function MediaLibraryView({
 
   useEffect(() => {
     if (!toast) return undefined;
+    if (onNotify) {
+      onNotify(toast);
+      setToast("");
+      return undefined;
+    }
     const timer = window.setTimeout(() => setToast(""), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
@@ -1345,7 +1349,7 @@ export default function MediaLibraryView({
                   placeholder={
                     card.shape === "round" ? (
                       <span className="mlv-card__person"><PlayerIcon name="person" /></span>
-                    ) : card.shape === "video" ? (
+                    ) : card.item?.type === "video" ? (
                       <img className="mlv-card__placeholder" src={playIcon} alt="" />
                     ) : card.kind === "album" ? (
                       <img className="mlv-card__placeholder" src={musicAlbumIcon} alt="" />
@@ -1740,6 +1744,7 @@ export default function MediaLibraryView({
                     role="button"
                     tabIndex={0}
                     aria-label="Afficher les playlists"
+                    title="Afficher les playlists"
                     onClick={(event) => {
                       event.stopPropagation();
                       setPlaylistsExpanded((prev) => !prev);
@@ -1854,10 +1859,6 @@ export default function MediaLibraryView({
               showVideo={showPanelVideo}
               setPanelHost={setPanelHost}
               onToggleFullscreen={onToggleFullscreen}
-              onPlay={() =>
-                selected &&
-                playFrom(selected, activeList.some((entry) => entry.id === selected.id) ? activeList : [selected])
-              }
             />
           ) : null}
         </div>
@@ -1926,7 +1927,7 @@ export default function MediaLibraryView({
       {toast ? (
         <div className="mlv-toast" role="status">
           <span>{toast}</span>
-          <button type="button" className="mlv-icon-btn" onClick={() => setToast("")} aria-label="Fermer">
+          <button type="button" className="mlv-icon-btn" onClick={() => setToast("")} aria-label="Fermer" title="Fermer">
             <PlayerIcon name="close" />
           </button>
         </div>

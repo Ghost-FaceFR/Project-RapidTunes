@@ -29,6 +29,10 @@ export async function fetchMediaPreview(url) {
   return invoke("preview_media", { url });
 }
 
+export async function searchMedia(query, limit = 12) {
+  return invoke("search_media", { query, limit });
+}
+
 export async function getDefaultDownloadDir() {
   return invoke("get_default_download_dir");
 }
@@ -51,4 +55,13 @@ export async function downloadUpdate(url, fileName) {
 
 export async function launchUpdate(path) {
   return invoke("launch_update", { path });
+}
+
+export async function getMissingTools() {
+  return invoke("missing_tools");
+}
+
+/** Installe yt-dlp, ffmpeg et deno s'ils manquent. Renvoie true si quelque chose a été installé. */
+export async function prepareTools() {
+  return invoke("prepare_tools");
 }

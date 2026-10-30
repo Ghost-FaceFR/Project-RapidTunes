@@ -23,6 +23,7 @@ pub fn run() {
       commands::resume_download,
       commands::download_batch,
       commands::preview_media,
+      commands::search_media,
       commands::get_default_download_dir,
       commands::get_default_video_dir,
       commands::pick_output_directory,
@@ -32,6 +33,8 @@ pub fn run() {
       commands::get_video_thumbnail,
       commands::update_media_tags,
       commands::pick_media_files,
+      commands::prepare_tools,
+      commands::missing_tools,
       commands::download_update,
       commands::launch_update
     ])

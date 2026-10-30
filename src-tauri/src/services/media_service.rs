@@ -8,13 +8,15 @@ use tokio::process::Command;
 use tokio::sync::mpsc;
 
 use crate::error::{AppError, AppResult};
+use crate::services::tools_service;
 use crate::models::{
   BatchDownloadRequest,
   DownloadProgressEvent,
   DownloadRequest,
   JobResult,
   MediaMode,
-  MediaPreview
+  MediaPreview,
+  SearchResult
 };
 
 const AUDIO_FORMATS: &[&str] = &["mp3", "wav", "flac", "aac"];
@@ -32,12 +34,12 @@ pub async fn fetch_media_preview(raw_url: &str) -> AppResult<MediaPreview> {
   let url = raw_url.trim();
   validate_preview_url(url)?;
 
-  let yt_dlp = resolve_binary_path("yt-dlp", "yt-dlp.exe")
-    .ok_or_else(|| AppError::CommandFailed("yt-dlp introuvable sur cette machine.".to_string()))?;
+  let yt_dlp = tools_service::require_binary("yt-dlp", "yt-dlp.exe").await?;
 
   let output = tokio::time::timeout(
     std::time::Duration::from_secs(120),
-    Command::new(yt_dlp)
+    no_window(Command::new(&yt_dlp))
+      .args(tools_service::js_runtime_args(&yt_dlp))
       .args([
         "--skip-download",
         "--dump-single-json",
@@ -54,14 +56,14 @@ pub async fn fetch_media_preview(raw_url: &str) -> AppResult<MediaPreview> {
   })??;
 
   if !output.status.success() {
-    let stderr = String::from_utf8(output.stderr)?;
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     return Err(AppError::CommandFailed(format!(
       "Impossible de récupérer l'aperçu média: {}",
       compact_output(&stderr)
     )));
   }
 
-  let stdout = String::from_utf8(output.stdout)?;
+  let stdout = String::from_utf8_lossy(&output.stdout).to_string();
   let json: Value = serde_json::from_str(&stdout)
     .map_err(|err| AppError::Validation(format!("Aperçu JSON invalide: {err}")))?;
 
@@ -136,13 +138,24 @@ where
     configured_rate_limit_kibps
   )?;
 
-  let yt_dlp = resolve_binary_path("yt-dlp", "yt-dlp.exe")
-    .ok_or_else(|| AppError::CommandFailed("yt-dlp introuvable sur cette machine.".to_string()))?;
-  let ffmpeg = resolve_binary_path("ffmpeg", "ffmpeg.exe");
+  if !tools_service::missing_tools().is_empty() {
+    emit_progress_event(
+      &mut emit_progress,
+      "preparing",
+      Some(0.0),
+      "Installation des composants requis (première utilisation, quelques minutes)...",
+      None,
+      None,
+      configured_rate_limit_kibps
+    )?;
+  }
+  let yt_dlp = tools_service::require_binary("yt-dlp", "yt-dlp.exe").await?;
+  let ffmpeg = tools_service::require_binary("ffmpeg", "ffmpeg.exe").await.ok();
 
-  let args = build_yt_dlp_args(&request, ffmpeg.as_deref());
+  let mut args = tools_service::js_runtime_args(&yt_dlp);
+  args.extend(build_yt_dlp_args(&request, ffmpeg.as_deref()));
 
-  let mut child = Command::new(yt_dlp)
+  let mut child = no_window(Command::new(&yt_dlp))
     .args(&args)
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
@@ -459,6 +472,8 @@ fn build_yt_dlp_args(request: &DownloadRequest, ffmpeg_bin: Option<&Path>) -> Ve
     args.push("--no-playlist".to_string());
   }
 
+  args.push("--encoding".to_string());
+  args.push("utf-8".to_string());
   args.push("--newline".to_string());
   args.push("--force-overwrites".to_string());
   args.push("--add-metadata".to_string());
@@ -584,9 +599,17 @@ async fn forward_process_output<R>(
 where
   R: AsyncRead + Unpin + Send + 'static
 {
-  let mut lines = BufReader::new(reader).lines();
+  // Lecture en octets puis décodage tolérant: yt-dlp peut émettre autre chose que de l'UTF-8
+  // (page de code Windows, titres accentués) et `lines()` échouerait avec "stream did not contain valid UTF-8".
+  let mut reader = BufReader::new(reader);
+  let mut buffer = Vec::new();
 
-  while let Some(line) = lines.next_line().await? {
+  loop {
+    buffer.clear();
+    if reader.read_until(b'\n', &mut buffer).await? == 0 {
+      break;
+    }
+    let line = String::from_utf8_lossy(&buffer).trim_end_matches(['\r', '\n']).to_string();
     if tx.send((stream, line)).is_err() {
       break;
     }
@@ -687,20 +710,40 @@ pub(crate) fn resolve_binary_path(cmd_name: &str, exe_name: &str) -> Option<Path
     return Some(PathBuf::from(cmd_name));
   }
 
+  if let Some(managed) = crate::services::tools_service::managed_binary(exe_name) {
+    return Some(managed);
+  }
+
   let local_app_data = std::env::var("LOCALAPPDATA").ok()?;
   let winget_packages = Path::new(&local_app_data).join("Microsoft").join("WinGet").join("Packages");
   find_file_recursively(&winget_packages, exe_name)
 }
 
+/// Empêche l'apparition d'une fenêtre console pour les processus lancés (Windows).
+pub(crate) fn no_window(mut command: Command) -> Command {
+  #[cfg(windows)]
+  command.creation_flags(0x0800_0000);
+  command
+}
+
+pub(crate) fn no_window_std(mut command: std::process::Command) -> std::process::Command {
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    command.creation_flags(0x0800_0000);
+  }
+  command
+}
+
 fn command_exists(cmd_name: &str) -> bool {
-  std::process::Command::new(cmd_name)
+  no_window_std(std::process::Command::new(cmd_name))
     .arg("--version")
     .output()
     .map(|output| output.status.success())
     .unwrap_or(false)
 }
 
-fn find_file_recursively(root: &Path, file_name: &str) -> Option<PathBuf> {
+pub(crate) fn find_file_recursively(root: &Path, file_name: &str) -> Option<PathBuf> {
   let entries = fs::read_dir(root).ok()?;
   for entry in entries.flatten() {
     let path = entry.path();
@@ -751,6 +794,86 @@ fn validate_preview_url(url: &str) -> AppResult<()> {
   }
 
   Ok(())
+}
+
+/// Recherche YouTube via yt-dlp (aucune clé d'API requise).
+pub async fn search_media(raw_query: &str, limit: usize) -> AppResult<Vec<SearchResult>> {
+  let query = raw_query.trim();
+  if query.is_empty() {
+    return Ok(Vec::new());
+  }
+  if query.starts_with('-') {
+    return Err(AppError::CommandFailed("Requête de recherche invalide.".to_string()));
+  }
+  let limit = limit.clamp(1, 50);
+
+  let yt_dlp = tools_service::require_binary("yt-dlp", "yt-dlp.exe").await?;
+
+  let output = tokio::time::timeout(
+    std::time::Duration::from_secs(45),
+    no_window(Command::new(&yt_dlp))
+      .args(tools_service::js_runtime_args(&yt_dlp))
+      .args([
+        "--flat-playlist",
+        "--dump-json",
+        "--no-warnings",
+        "--no-call-home",
+        "--ignore-errors",
+        &format!("ytsearch{limit}:{query}")
+      ])
+      .output()
+  )
+  .await
+  .map_err(|_| AppError::CommandFailed("La recherche a dépassé 45 secondes. Réessaie.".to_string()))??;
+
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  let results: Vec<SearchResult> = stdout
+    .lines()
+    .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+    .filter_map(|json| build_search_result(&json))
+    .collect();
+
+  if results.is_empty() && !output.status.success() {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    return Err(AppError::CommandFailed(format!(
+      "Recherche impossible: {}",
+      compact_output(&stderr)
+    )));
+  }
+
+  Ok(results)
+}
+
+fn build_search_result(json: &Value) -> Option<SearchResult> {
+  let video_id = json.get("id").and_then(Value::as_str)?.trim().to_string();
+  if video_id.is_empty() {
+    return None;
+  }
+  let title = pick_text_field(json, &["title"])?;
+  let duration_seconds = json.get("duration").and_then(|value| {
+    as_u64(value).or_else(|| value.as_f64().filter(|v| *v >= 0.0).map(|v| v as u64))
+  });
+  let url = pick_text_field(json, &["webpage_url", "url"])
+    .filter(|value| value.starts_with("http"))
+    .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={video_id}"));
+  let is_live = json
+    .get("live_status")
+    .and_then(Value::as_str)
+    .map(|status| status == "is_live")
+    .unwrap_or(false);
+
+  Some(SearchResult {
+    thumbnail_url: pick_thumbnail_url(json)
+      .or_else(|| Some(format!("https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"))),
+    video_id,
+    url,
+    title,
+    channel: pick_text_field(json, &["channel", "uploader"]),
+    duration_seconds,
+    duration_text: duration_seconds.filter(|value| *value > 0).map(format_duration),
+    view_count: json.get("view_count").and_then(as_u64),
+    is_live
+  })
 }
 
 fn build_preview_from_json(url: &str, json: &Value) -> MediaPreview {

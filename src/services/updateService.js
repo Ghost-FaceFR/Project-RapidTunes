@@ -1,4 +1,5 @@
-const LATEST_RELEASE_URL = "https://api.github.com/repos/Ghost-FaceFR/Project-RapidTunes/releases/latest";
+const RELEASES_URL = "https://api.github.com/repos/Ghost-FaceFR/Project-RapidTunes/releases";
+const LATEST_RELEASE_URL = `${RELEASES_URL}/latest`;
 
 function parseVersion(value) {
   return String(value ?? "")
@@ -26,6 +27,57 @@ function pickInstallerAsset(assets) {
     candidates[0] ??
     null
   );
+}
+
+/**
+ * Découpe le corps markdown d'une release en sections { title, items }.
+ * Les titres (#, ##, ###) ouvrent une section, les puces (-, *) en sont les éléments.
+ * Le texte hors puces est conservé comme élément pour ne rien perdre.
+ */
+export function parseReleaseNotes(body) {
+  const sections = [];
+  let current = null;
+  const ensure = (title = "") => {
+    if (!current) {
+      current = { title, items: [] };
+      sections.push(current);
+    }
+    return current;
+  };
+  for (const raw of String(body ?? "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const heading = line.match(/^#{1,6}\s+(.*)$/);
+    if (heading) {
+      current = { title: heading[1].replace(/[*_`]/g, "").trim(), items: [] };
+      sections.push(current);
+      continue;
+    }
+    const bullet = line.match(/^[-*+]\s+(.*)$/);
+    ensure().items.push((bullet ? bullet[1] : line).replace(/\*\*/g, "").trim());
+  }
+  return sections.filter((section) => section.items.length > 0);
+}
+
+/** Renvoie l'historique des versions publiées : [{ version, name, date, pageUrl, sections }]. */
+export async function fetchChangelog(limit = 20) {
+  const response = await fetch(`${RELEASES_URL}?per_page=${limit}`, {
+    headers: { Accept: "application/vnd.github+json" }
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub a répondu ${response.status}.`);
+  }
+  const releases = await response.json();
+  return releases
+    .filter((release) => !release.draft)
+    .map((release) => ({
+      version: String(release.tag_name ?? "").replace(/^v/i, ""),
+      name: release.name ?? "",
+      date: release.published_at ?? release.created_at ?? null,
+      prerelease: Boolean(release.prerelease),
+      pageUrl: release.html_url ?? null,
+      sections: parseReleaseNotes(release.body)
+    }));
 }
 
 /** Interroge GitHub et renvoie { version, notes, pageUrl, asset, available }. */

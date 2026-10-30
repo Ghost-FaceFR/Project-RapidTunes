@@ -126,8 +126,9 @@ rapidtunes.bat        Lanceur Windows
 ## Publier une mise à jour
 
 1. Augmenter la version dans `package.json`, `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`.
-2. Compiler : `rapidtunes.bat build`.
-3. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`) et y joindre l'installateur (`.exe` ou `.msi`).
+2. Compléter `CHANGELOG.md`.
+3. Compiler : `rapidtunes.bat build` (produit `release\RapidTunes_<version>_x64-setup.exe`).
+4. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`), dont le texte reprend la section du `CHANGELOG.md` (il alimente le journal des modifications de l'application), et y joindre l'installateur `-setup.exe`.
 
 L'application compare le tag de la dernière release à sa version et propose la mise à jour si elle est plus récente.
 
@@ -138,4 +139,4 @@ L'application compare le tag de la dernière release à sa version et propose la
 
 ## Auteur
 
-© 2026 **Ghost Face**. Tous droits réservés.
+© 2026 **Ghost Industry**. Tous droits réservés.

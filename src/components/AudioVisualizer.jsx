@@ -16,6 +16,17 @@ export const VISUALIZER_COLORS = [
   { id: "pink", label: "Rose", colors: ["#be185d", "#ec4899", "#fbcfe8"] },
   { id: "rainbow", label: "Arc-en-ciel", colors: ["#ef4444", "#22c55e", "#3b82f6"] },
   { id: "white", label: "Blanc", colors: ["#9ca3af", "#e5e7eb", "#ffffff"] },
+  { id: "sunset", label: "Coucher de soleil", colors: ["#7c3aed", "#f43f5e", "#fbbf24"] },
+  { id: "neon", label: "Néon", colors: ["#0ea5e9", "#d946ef", "#fde047"] },
+  { id: "cyberpunk", label: "Cyberpunk", colors: ["#f0abfc", "#ec4899", "#22d3ee"] },
+  { id: "ice", label: "Glace", colors: ["#1e40af", "#60a5fa", "#e0f2fe"] },
+  { id: "mint", label: "Menthe", colors: ["#0f766e", "#2dd4bf", "#ccfbf1"] },
+  { id: "gold", label: "Or", colors: ["#a16207", "#eab308", "#fef08a"] },
+  { id: "lava", label: "Lave", colors: ["#450a0a", "#dc2626", "#fb923c"] },
+  { id: "aurora", label: "Aurore boréale", colors: ["#2563eb", "#10b981", "#a78bfa"] },
+  { id: "candy", label: "Bonbon", colors: ["#f472b6", "#a78bfa", "#67e8f9"] },
+  { id: "matrix", label: "Matrix", colors: ["#052e16", "#16a34a", "#86efac"] },
+  { id: "mono", label: "Noir et gris", colors: ["#262626", "#737373", "#d4d4d4"] },
   { id: "custom", label: "Personnalisée", colors: null }
 ];
 
@@ -70,13 +81,18 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
     let width = 0;
     let height = 0;
     const resize = () => {
-      const ratio = window.devicePixelRatio || 1;
+      const ratio = 1;
       width = canvas.clientWidth;
       height = canvas.clientHeight;
       canvas.width = Math.max(1, Math.floor(width * ratio));
       canvas.height = Math.max(1, Math.floor(height * ratio));
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      gradient = context.createLinearGradient(0, height, 0, 0);
+      gradient.addColorStop(0, colors.a);
+      gradient.addColorStop(0.55, colors.b);
+      gradient.addColorStop(1, colors.c);
     };
+    let gradient = null;
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
@@ -87,8 +103,15 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
     let frame = 0;
     let phase = 0;
 
-    const draw = () => {
-      frame = requestAnimationFrame(draw);
+    const FRAME_INTERVAL = 1000 / 30;
+    let lastDraw = 0;
+
+    const draw = (now = 0) => {
+      // Lecture en cours: boucle animée (limitée à ~30 ips, suspendue si la fenêtre est masquée).
+      // En pause: un seul rendu statique, sans boucle.
+      if (isPlaying) frame = requestAnimationFrame(draw);
+      if (isPlaying && (document.hidden || now - lastDraw < FRAME_INTERVAL)) return;
+      lastDraw = now;
       context.clearRect(0, 0, width, height);
 
       const analyser = getAnalyser?.();
@@ -99,14 +122,9 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
       const active = Boolean(analyser) && isPlaying;
       if (active) {
         analyser.getByteFrequencyData(frequencyData);
-        analyser.getByteTimeDomainData(timeData);
+        if (mode === "wave") analyser.getByteTimeDomainData(timeData);
       }
       phase += 0.02;
-
-      const gradient = context.createLinearGradient(0, height, 0, 0);
-      gradient.addColorStop(0, colors.a);
-      gradient.addColorStop(0.55, colors.b);
-      gradient.addColorStop(1, colors.c);
 
       if (mode === "bars") {
         const count = Math.max(16, Math.min(64, Math.floor(width / 12)));
@@ -136,7 +154,7 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
         context.lineWidth = 2.5;
         context.strokeStyle = gradient;
         context.shadowColor = colors.b;
-        context.shadowBlur = 12;
+        context.shadowBlur = 6;
         context.beginPath();
         const points = 160;
         for (let i = 0; i <= points; i += 1) {
@@ -187,9 +205,17 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
     };
 
     draw();
+    const handleVisibility = () => {
+      if (!document.hidden && isPlaying) {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [getAnalyser, mode, isPlaying, colorTheme, customColor]);
 

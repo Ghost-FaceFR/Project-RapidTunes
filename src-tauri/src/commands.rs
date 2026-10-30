@@ -11,9 +11,10 @@ use crate::models::{
   JobResult,
   LibraryItem,
   MediaPreview,
-  MediaTagsUpdate
+  MediaTagsUpdate,
+  SearchResult
 };
-use crate::services::{library_service, media_service};
+use crate::services::{library_service, media_service, tools_service};
 use crate::DownloadControlState;
 
 const DOWNLOAD_PROGRESS_EVENT: &str = "download-progress";
@@ -125,6 +126,13 @@ pub async fn preview_media(url: String) -> Result<MediaPreview, String> {
 }
 
 #[tauri::command]
+pub async fn search_media(query: String, limit: Option<usize>) -> Result<Vec<SearchResult>, String> {
+  media_service::search_media(&query, limit.unwrap_or(12))
+    .await
+    .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn get_default_download_dir() -> Option<String> {
   dirs::download_dir().map(|path| path.to_string_lossy().to_string())
 }
@@ -212,7 +220,7 @@ pub async fn open_file_location(path: String) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 async fn kill_process_tree(pid: u32) -> Result<(), String> {
   let pid_str = pid.to_string();
-  let output = Command::new("taskkill")
+  let output = media_service::no_window(Command::new("taskkill"))
     .args(["/PID", &pid_str, "/T", "/F"])
     .output()
     .await
@@ -276,7 +284,7 @@ foreach ($id in $ids) {{
 "#
   );
 
-  let output = Command::new("powershell")
+  let output = media_service::no_window(Command::new("powershell"))
     .args(["-NoProfile", "-NonInteractive", "-Command", &script])
     .output()
     .await
@@ -493,7 +501,7 @@ pub async fn launch_update(app: AppHandle, path: String) -> Result<(), String> {
 
   #[cfg(target_os = "windows")]
   {
-    std::process::Command::new("cmd")
+    media_service::no_window_std(std::process::Command::new("cmd"))
       .args(["/C", "start", ""])
       .arg(&target)
       .spawn()
@@ -506,4 +514,17 @@ pub async fn launch_update(app: AppHandle, path: String) -> Result<(), String> {
 
   app.exit(0);
   Ok(())
+}
+
+/// Installe en arrière-plan yt-dlp, ffmpeg et deno s'ils sont absents. Renvoie true si quelque chose manquait.
+#[tauri::command]
+pub async fn prepare_tools() -> Result<bool, String> {
+  let had_missing = !tools_service::missing_tools().is_empty();
+  tools_service::prepare_all().await.map_err(|err| err.to_string())?;
+  Ok(had_missing)
+}
+
+#[tauri::command]
+pub fn missing_tools() -> Vec<String> {
+  tools_service::missing_tools().into_iter().map(String::from).collect()
 }

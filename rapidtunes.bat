@@ -187,6 +187,10 @@ if errorlevel 1 (
   goto :failure
 )
 echo [INFO] Exécutable: %cd%\release\RapidTunes.exe
+for %%S in ("%cd%\src-tauri\target\release\bundle\nsis\*-setup.exe") do (
+  copy /Y "%%~fS" "%cd%\release\" >nul
+  echo [INFO] Installateur: %cd%\release\%%~nxS
+)
 start "" "%cd%\release\"
 goto :post_action
 

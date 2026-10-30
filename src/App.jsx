@@ -6,6 +6,8 @@ import {
   fetchMediaPreview,
   getDefaultDownloadDir,
   getDefaultVideoDir,
+  getMissingTools,
+  prepareTools,
   pauseActiveDownload,
   pickOutputDirectory,
   openFileLocation,
@@ -15,7 +17,8 @@ import {
   runSingleJob,
   subscribeToDownloadProgress
 } from "./services/tauriClient";
-import { checkForUpdate } from "./services/updateService";
+import MediaSearch from "./components/MediaSearch";
+import { checkForUpdate, fetchChangelog } from "./services/updateService";
 import { useMediaEngine } from "./services/mediaEngine";
 import {
   getMediaCover,
@@ -28,6 +31,7 @@ import {
 import MediaLibraryView from "./components/MediaLibraryView";
 import PlayerIcon from "./components/PlayerIcon";
 import TooltipLayer from "./components/TooltipLayer";
+import ToastLayer from "./components/ToastLayer";
 import AudioVisualizer, { VISUALIZER_MODES, VISUALIZER_COLORS } from "./components/AudioVisualizer";
 import { isValidUrl, validateJob } from "./utils/validators";
 import windowReduceIcon from "./assets/images/components/window_reduce.png";
@@ -189,6 +193,17 @@ const INITIAL_FORM = {
 const APP_VERSION = packageInfo.version;
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const DEFAULT_VIDEO_SETTINGS = { brightness: 100, contrast: 100, saturation: 100, fit: "contain" };
+const VIDEO_FIT_MODES = [
+  { id: "contain", label: "Ajuster" },
+  { id: "cover", label: "Remplir" },
+  { id: "fill", label: "Étirer" }
+];
+const VIDEO_ADJUSTMENTS = [
+  { id: "brightness", label: "Luminosité" },
+  { id: "contrast", label: "Contraste" },
+  { id: "saturation", label: "Saturation" }
+];
 
 const EQ_BANDS = ["62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"];
 const EQ_RANGE_DB = 12;
@@ -692,55 +707,14 @@ function formatHistoryDate(value, _locale = "fr-FR", use24HourClock = true) {
 }
 
 function LabelWithTooltip({ label, tooltip }) {
-  const [side, setSide] = useState("right");
-  const chipRef = useRef(null);
-  const bubbleRef = useRef(null);
-
-  const computeTooltipSide = () => {
-    const chip = chipRef.current;
-    const bubble = bubbleRef.current;
-
-    if (!chip || !bubble) return;
-
-    const chipRect = chip.getBoundingClientRect();
-    const bubbleWidth = bubble.offsetWidth || 260;
-    const edgePadding = 12;
-
-    const overflowRight = chipRect.right + 10 + bubbleWidth > window.innerWidth - edgePadding;
-    const overflowLeft = chipRect.left - 10 - bubbleWidth < edgePadding;
-
-    if (overflowRight && !overflowLeft) {
-      setSide("left");
-      return;
-    }
-
-    setSide("right");
-  };
-
-  useEffect(() => {
-    const handleResize = () => computeTooltipSide();
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
   return (
     <span className="field-label">
       <span>{label}</span>
-      <span
-        ref={chipRef}
-        className="tooltip-chip"
-        data-side={side}
-        aria-label={`Info: ${label}`}
-        onMouseEnter={computeTooltipSide}
-      >
-        <img src={questionIcon} alt="" className="tooltip-chip__icon" />
-        <span ref={bubbleRef} className="tooltip-chip__bubble" role="tooltip">
-          {tooltip}
+      {tooltip ? (
+        <span className="tooltip-chip" data-tip={tooltip} aria-label={`Info: ${label}`} tabIndex={0}>
+          <img src={questionIcon} alt="" className="tooltip-chip__icon" />
         </span>
-      </span>
+      ) : null}
     </span>
   );
 }
@@ -916,7 +890,11 @@ export default function App() {
   const [errorRetryModal, setErrorRetryModal] = useState(null);
   const [globalErrorModal, setGlobalErrorModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const toastCounterRef = useRef(0);
   const [updateState, setUpdateState] = useState({ status: "idle", info: null, message: "" });
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+  const [changelog, setChangelog] = useState({ status: "idle", releases: [], message: "" });
   const [activeTopTab, setActiveTopTab] = useState("media-player");
   const [activeMainView, setActiveMainView] = useState("home");
   const [mediaDlMenuOpen, setMediaDlMenuOpen] = useState(false);
@@ -961,6 +939,10 @@ export default function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
+  const [isVisualizerMenuOpen, setIsVisualizerMenuOpen] = useState(false);
+  const wasMaximizedBeforeFullscreenRef = useRef(false);
+  const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
+  const [videoSettings, setVideoSettings] = useState(DEFAULT_VIDEO_SETTINGS);
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isEqEnabled, setIsEqEnabled] = useState(false);
   const [eqPresetId, setEqPresetId] = useState("flat");
@@ -1063,6 +1045,18 @@ export default function App() {
     onEnded: handleTrackEnded
   });
 
+  useEffect(() => {
+    const element = engine.element;
+    if (!element) return;
+    // Un filtre CSS même neutre force un rendu GPU supplémentaire: on ne l'applique que si un réglage a changé.
+    const isNeutral =
+      videoSettings.brightness === 100 && videoSettings.contrast === 100 && videoSettings.saturation === 100;
+    element.style.filter = isNeutral
+      ? ""
+      : `brightness(${videoSettings.brightness}%) contrast(${videoSettings.contrast}%) saturate(${videoSettings.saturation}%)`;
+    element.style.objectFit = videoSettings.fit;
+  }, [engine.element, videoSettings]);
+
   const isAudioPlaying = engine.isPlaying;
   isMiniPlayerRef.current = isMiniPlayer;
   const visualizerMode = VISUALIZER_MODES.some((entry) => entry.id === settings.playerVisualizer)
@@ -1160,9 +1154,9 @@ export default function App() {
         if (cancelled) return;
         setPreview(null);
         setAnalyzedUrl(url);
-        setPreviewError(
-          typeof err === "string" && err.trim() ? err : "Impossible d'analyser ce lien."
-        );
+        const previewMessage = typeof err === "string" && err.trim() ? err : "Impossible d'analyser ce lien.";
+        setPreviewError(previewMessage);
+        notifyRef.current(previewMessage, { kind: "error", duration: 8000, id: "preview-error", title: "Analyse impossible" });
       } finally {
         if (!cancelled) {
           setPreviewLoading(false);
@@ -1693,6 +1687,31 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    let unlisten = null;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const maximized = await getCurrentWindow().isMaximized();
+        if (!cancelled) setIsWindowMaximized(maximized);
+      } catch {
+        // Hors contexte Tauri (mode web): l'état reste « non agrandie ».
+      }
+    };
+    refresh();
+    getCurrentWindow()
+      .onResized(refresh)
+      .then((off) => {
+        if (cancelled) off();
+        else unlisten = off;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   const handleWindowAction = async (action) => {
     try {
       const appWindow = getCurrentWindow();
@@ -1775,6 +1794,133 @@ export default function App() {
       setUpdateState((prev) => ({ ...prev, status: "error", message: String(error) }));
     }
   };
+
+  const renderUpdatePanel = () => (
+    <div className="about-update" aria-live="polite">
+      <p className="about-update__status">
+        {updateState.status === "checking" && "Recherche de mises à jour..."}
+        {updateState.status === "uptodate" &&
+          (updateState.message || "RapidTunes est à jour.")}
+        {updateState.status === "available" &&
+          `Nouvelle version disponible : ${updateState.info.version} (actuelle : ${APP_VERSION})`}
+        {updateState.status === "downloading" && "Téléchargement de la mise à jour..."}
+        {updateState.status === "ready" && "Mise à jour téléchargée. Prête à être installée."}
+        {updateState.status === "error" && updateState.message}
+        {updateState.status === "idle" && "Vérifie si une nouvelle version est disponible."}
+      </p>
+      <div className="about-update__actions">
+        {updateState.status === "available" ? (
+          <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleDownloadUpdate}>
+            Télécharger la mise à jour
+          </button>
+        ) : null}
+        {updateState.status === "ready" ? (
+          <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleInstallUpdate}>
+            Installer et redémarrer
+          </button>
+        ) : null}
+        {updateState.status !== "downloading" && updateState.status !== "ready" ? (
+          <button
+            type="button"
+            className="about-update__btn"
+            onClick={() => handleCheckUpdate()}
+            disabled={updateState.status === "checking"}
+          >
+            Rechercher des mises à jour
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  // Vérification au démarrage (silencieuse), puis téléchargement automatique si l'option est activée.
+  useEffect(() => {
+    if (!settings.checkUpdatesOnStartup && !settings.autoUpdate) return;
+    (async () => {
+      try {
+        const info = await checkForUpdate(APP_VERSION);
+        if (!info.available) {
+          setUpdateState((prev) => (prev.status === "idle" ? { status: "uptodate", info, message: "" } : prev));
+          return;
+        }
+        setUpdateState({ status: "available", info, message: "" });
+        if (settings.autoUpdate && info.asset) {
+          setUpdateState((prev) => ({ ...prev, status: "downloading" }));
+          const path = await downloadUpdate(info.asset.url, info.asset.name);
+          setUpdateState((prev) => ({ ...prev, status: "ready", message: "", path }));
+        }
+      } catch (error) {
+        console.warn("Vérification des mises à jour au démarrage impossible:", error);
+        setUpdateState((prev) => (prev.status === "downloading" ? { ...prev, status: "available" } : prev));
+      }
+    })();
+    // Une seule fois au lancement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismissToast = (id) => setToasts((prev) => prev.filter((toast) => toast.id !== id));
+
+  /** Affiche une notification. Une notification avec le même `id` en remplace une existante. */
+  const notify = (message, { kind = "info", duration = 6000, id, title } = {}) => {
+    if (!message) return;
+    toastCounterRef.current += 1;
+    const toastId = id ?? `toast-${toastCounterRef.current}`;
+    setToasts((prev) => [...prev.filter((toast) => toast.id !== toastId), { id: toastId, key: toastCounterRef.current, kind, duration, title, message }].slice(-4));
+  };
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+
+  // Les erreurs et résultats d'actions passent tous par les notifications.
+  useEffect(() => {
+    if (!error) return;
+    notifyRef.current(error, { kind: "error", duration: 8000 });
+    setError("");
+  }, [error]);
+
+  useEffect(() => {
+    if (!resultMessage) return;
+    notifyRef.current(resultMessage, { kind: resultSuccess ? "success" : "error", duration: resultSuccess ? 4000 : 8000 });
+    setResultMessage("");
+  }, [resultMessage, resultSuccess]);
+
+  // Installe automatiquement yt-dlp, ffmpeg et deno s'ils manquent (machine vierge).
+  useEffect(() => {
+    (async () => {
+      try {
+        const missing = await getMissingTools();
+        if (!missing.length) return;
+        notifyRef.current(
+          "Installation des composants requis (yt-dlp, ffmpeg) : première utilisation, quelques minutes. Une connexion Internet est nécessaire.",
+          { id: "tools", kind: "info", duration: 0, title: "Installation en cours" }
+        );
+        await prepareTools();
+        notifyRef.current("Composants installés. Tout est prêt.", { id: "tools", kind: "success", duration: 4000 });
+      } catch (error) {
+        notifyRef.current(
+          `${String(error?.message ?? error)} Vérifie ta connexion Internet puis relance RapidTunes.`,
+          { id: "tools", kind: "error", duration: 12000, title: "Installation impossible" }
+        );
+      }
+    })();
+  }, []);
+
+  const loadChangelog = async () => {
+    setChangelog((prev) => ({ ...prev, status: "loading", message: "" }));
+    try {
+      const releases = await fetchChangelog();
+      setChangelog({ status: "ready", releases, message: "" });
+    } catch (error) {
+      setChangelog({ status: "error", releases: [], message: `Journal des modifications indisponible : ${error?.message ?? error}` });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTopTab === "about" && changelog.status === "idle") {
+      loadChangelog();
+    }
+    // Chargé à la première ouverture de l'onglet « À propos ».
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTopTab]);
 
   useEffect(() => {
     handleCheckUpdate({ silent: true });
@@ -2294,7 +2440,12 @@ export default function App() {
           <div className="media-player-bar__text">
             <strong>{playingLibraryMedia?.title ?? "Aucun titre"}</strong>
             <span>
-              {engine.error || `${playingLibraryMedia?.artist ?? "Artiste inconnu"} • ${playingLibraryMedia?.album ?? ""}`}
+              {engine.error ||
+                (playingLibraryMedia?.type === "video"
+                  ? [playingLibraryMedia.artist, playingLibraryMedia.album]
+                      .filter((value) => value && value !== "Artiste inconnu" && value !== "Album inconnu")
+                      .join(" • ")
+                  : `${playingLibraryMedia?.artist ?? "Artiste inconnu"} • ${playingLibraryMedia?.album ?? ""}`)}
             </span>
           </div>
         </div>
@@ -2324,7 +2475,7 @@ export default function App() {
             className="media-player-btn media-player-btn--play"
             onClick={engine.toggle}
             aria-label={isAudioPlaying ? "Mettre en pause" : "Lire"}
-            title={isAudioPlaying ? "Pause" : "Lecture"}
+            title={isAudioPlaying ? "Pause (Espace)" : "Lecture (Espace)"}
           >
             <PlayerIcon name={isAudioPlaying ? "pause" : "play"} />
           </button>
@@ -2404,7 +2555,7 @@ export default function App() {
             className="media-player-btn"
             onClick={() => setVideoDisplayMode(isFullscreen ? "windowed" : "fullscreen")}
             aria-label={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
-            title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+            title={isFullscreen ? "Quitter le plein écran (Échap)" : "Plein écran"}
           >
             <PlayerIcon name={isFullscreen ? "minimize" : "maximize"} />
           </button>
@@ -2415,6 +2566,7 @@ export default function App() {
               onClick={() => {
                 setIsMoreMenuOpen((prev) => !prev);
                 setIsSpeedMenuOpen(false);
+                setIsVisualizerMenuOpen(false);
               }}
               aria-haspopup="menu"
               aria-expanded={isMoreMenuOpen}
@@ -2449,20 +2601,17 @@ export default function App() {
                   </span>
                 </button>
                 {isSpeedMenuOpen ? (
-                  <div className="media-player-menu__sub" role="group" aria-label="Vitesse de lecture">
+                  <div className="media-player-menu__speeds" role="group" aria-label="Vitesse de lecture">
                     {PLAYBACK_SPEEDS.map((speed) => (
                       <button
                         key={speed}
                         type="button"
                         role="menuitemradio"
                         aria-checked={playbackSpeed === speed}
-                        className="media-player-menu__item media-player-menu__item--sub"
+                        className={`media-player-menu__speed ${playbackSpeed === speed ? "active" : ""}`}
                         onClick={() => setPlaybackSpeed(speed)}
                       >
-                        <span className="media-player-menu__check">
-                          {playbackSpeed === speed ? <PlayerIcon name="check" /> : null}
-                        </span>
-                        <span>{speed === 1 ? "Normale (1x)" : `${speed}x`}</span>
+                        {speed === 1 ? "1x" : `${speed}x`}
                       </button>
                     ))}
                   </div>
@@ -2471,29 +2620,137 @@ export default function App() {
                   type="button"
                   role="menuitem"
                   className="media-player-menu__item"
-                  onClick={() => {
-                    const index = VISUALIZER_MODES.findIndex((entry) => entry.id === visualizerMode);
-                    updateSetting("playerVisualizer", VISUALIZER_MODES[(index + 1) % VISUALIZER_MODES.length].id);
-                  }}
+                  onClick={() => setIsVisualizerMenuOpen((prev) => !prev)}
+                  aria-expanded={isVisualizerMenuOpen}
                 >
                   <PlayerIcon name="equalizer" />
                   <span>
-                    Visualisation : {VISUALIZER_MODES.find((entry) => entry.id === visualizerMode)?.label}
+                    Visualisation ({VISUALIZER_MODES.find((entry) => entry.id === visualizerMode)?.label})
                   </span>
-                  <span />
+                  <span className={`media-player-menu__chevron ${isVisualizerMenuOpen ? "open" : ""}`}>
+                    <PlayerIcon name="chevron" />
+                  </span>
                 </button>
+                {isVisualizerMenuOpen ? (
+                  <div className="media-player-menu__viz" role="group" aria-label="Visualisation">
+                    <div className="media-player-menu__speeds" role="radiogroup" aria-label="Style de visualisation">
+                      {VISUALIZER_MODES.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={visualizerMode === entry.id}
+                          className={`media-player-menu__speed ${visualizerMode === entry.id ? "active" : ""}`}
+                          onClick={() => updateSetting("playerVisualizer", entry.id)}
+                        >
+                          {entry.label}
+                        </button>
+                      ))}
+                    </div>
+                    {visualizerMode !== "off" ? (
+                      <>
+                        <p className="media-player-menu__label">Couleurs</p>
+                        <div className="media-player-menu__colors" role="radiogroup" aria-label="Couleurs de la visualisation">
+                          {VISUALIZER_COLORS.map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={settings.playerVisualizerColor === entry.id}
+                              className={`media-player-menu__color ${settings.playerVisualizerColor === entry.id ? "active" : ""}`}
+                              onClick={() => updateSetting("playerVisualizerColor", entry.id)}
+                            >
+                              <span
+                                className="media-player-menu__swatch"
+                                style={{
+                                  background: entry.colors
+                                    ? `linear-gradient(90deg, ${entry.colors.join(", ")})`
+                                    : entry.id === "custom"
+                                      ? settings.playerVisualizerCustomColor
+                                      : "linear-gradient(90deg, var(--neon-2), var(--neon-1), var(--neon-3))"
+                                }}
+                              />
+                              <span>{entry.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {settings.playerVisualizerColor === "custom" ? (
+                          <label className="media-player-menu__slider">
+                            <span>Couleur personnalisée</span>
+                            <input
+                              type="color"
+                              value={settings.playerVisualizerCustomColor}
+                              onChange={(event) => updateSetting("playerVisualizerCustomColor", event.target.value)}
+                            />
+                          </label>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
                 <button type="button" role="menuitem" className="media-player-menu__item" disabled title="Non disponible">
                   <PlayerIcon name="cast" />
                   <span>Diffuser sur un appareil</span>
                   <kbd>Ctrl+K</kbd>
                 </button>
-                <button type="button" role="menuitem" className="media-player-menu__item" disabled title="Non disponible">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="media-player-menu__item"
+                  disabled={playingLibraryMedia?.type !== "video"}
+                  title={playingLibraryMedia?.type !== "video" ? "Disponible pour les vidéos" : undefined}
+                  onClick={() => setIsVideoSettingsOpen((prev) => !prev)}
+                  aria-expanded={isVideoSettingsOpen}
+                >
                   <PlayerIcon name="video" />
                   <span>Paramètres vidéo</span>
-                  <span className="media-player-menu__chevron">
+                  <span className={`media-player-menu__chevron ${isVideoSettingsOpen ? "open" : ""}`}>
                     <PlayerIcon name="chevron" />
                   </span>
                 </button>
+                {isVideoSettingsOpen && playingLibraryMedia?.type === "video" ? (
+                  <div className="media-player-menu__sub" role="group" aria-label="Paramètres vidéo">
+                    {VIDEO_ADJUSTMENTS.map((adjustment) => (
+                      <label key={adjustment.id} className="media-player-menu__slider">
+                        <span>{adjustment.label} ({videoSettings[adjustment.id]}%)</span>
+                        <input
+                          type="range"
+                          min="50"
+                          max="150"
+                          step="5"
+                          value={videoSettings[adjustment.id]}
+                          onChange={(event) =>
+                            setVideoSettings((prev) => ({ ...prev, [adjustment.id]: Number(event.target.value) }))
+                          }
+                        />
+                      </label>
+                    ))}
+                    {VIDEO_FIT_MODES.map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={videoSettings.fit === mode.id}
+                        className="media-player-menu__item media-player-menu__item--sub"
+                        onClick={() => setVideoSettings((prev) => ({ ...prev, fit: mode.id }))}
+                      >
+                        <span className="media-player-menu__check">
+                          {videoSettings.fit === mode.id ? <PlayerIcon name="check" /> : null}
+                        </span>
+                        <span>{mode.label}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="media-player-menu__item media-player-menu__item--sub"
+                      onClick={() => setVideoSettings(DEFAULT_VIDEO_SETTINGS)}
+                    >
+                      <span />
+                      <span>Réinitialiser</span>
+                    </button>
+                  </div>
+                ) : null}
                 <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(-10)}>
                   <PlayerIcon name="back10" />
                   <span>Retour rapide de 10 secondes</span>
@@ -2697,7 +2954,24 @@ export default function App() {
     // Vrai plein écran: la fenêtre occupe tout l'écran et ne peut plus être déplacée.
     (async () => {
       try {
-        await getCurrentWindow().setFullscreen(isPlayerFullscreen);
+        const appWindow = getCurrentWindow();
+        if (isPlayerFullscreen) {
+          // Sans cadre de redimensionnement ni barre des tâches par-dessus, la bordure Windows disparaît.
+          // Une fenêtre sans cadre agrandie garde la zone de travail (barre des tâches visible): on la restaure d'abord.
+          wasMaximizedBeforeFullscreenRef.current = await appWindow.isMaximized();
+          if (wasMaximizedBeforeFullscreenRef.current) await appWindow.unmaximize();
+          await appWindow.setResizable(false);
+          await appWindow.setAlwaysOnTop(true);
+          await appWindow.setFullscreen(true);
+        } else {
+          await appWindow.setFullscreen(false);
+          if (!isMiniPlayerRef.current) await appWindow.setAlwaysOnTop(false);
+          await appWindow.setResizable(true);
+          if (wasMaximizedBeforeFullscreenRef.current) {
+            wasMaximizedBeforeFullscreenRef.current = false;
+            await appWindow.maximize();
+          }
+        }
       } catch (err) {
         console.warn("Plein écran indisponible hors contexte Tauri:", err);
       }
@@ -2724,6 +2998,7 @@ export default function App() {
       if (event.target instanceof Element && event.target.closest(".media-player-menu-anchor")) return;
       setIsMoreMenuOpen(false);
       setIsSpeedMenuOpen(false);
+      setIsVisualizerMenuOpen(false);
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
@@ -2840,8 +3115,8 @@ export default function App() {
               className="window-btn"
               onMouseDown={stopDragPropagation}
               onClick={() => handleWindowAction("maximize")}
-              aria-label="Agrandir / Restaurer"
-              title="Agrandir / Restaurer"
+              aria-label={isWindowMaximized ? "Restaurer" : "Agrandir"}
+              title={isWindowMaximized ? "Restaurer" : "Agrandir"}
             >
               <img src={windowMaximizeIcon} alt="" className="window-btn-icon" />
             </button>
@@ -2860,33 +3135,22 @@ export default function App() {
 
         <div className="window-content">
           <form
-            className={`converter-form ${activeTopTab === "media-dl" ? "converter-form--unified" : ""}`}
+            className={`converter-form ${activeTopTab === "media-dl" ? "converter-form--unified" : ""} ${activeTopTab === "media-player" ? "converter-form--player" : ""}`}
             onSubmit={handleFormSubmit}
           >
             {activeTopTab === "media-dl" ? (
               <>
             <div className="form-field form-field--url">
               <LabelWithTooltip
-                label="URL du média"
-                tooltip="Colle un lien direct YouTube / playlist etc..."
+                label="Lien ou recherche"
+                tooltip="Colle un lien direct YouTube / playlist etc... ou tape un titre pour chercher sur YouTube."
               />
-              <input
-                type="url"
-                name="url"
-                className="url-input"
-                value={form.url}
-                onChange={handleChange}
-                placeholder="https://example.com/video"
-                required
-              />
+              <MediaSearch url={form.url} onUrlChange={(url) => setForm((prev) => ({ ...prev, url }))} />
             </div>
 
             <div className="form-grid">
               <div className="form-field">
-                <LabelWithTooltip
-                  label="Format"
-                  tooltip="Choisis le format de conversion."
-                />
+                <LabelWithTooltip label="Format" />
                 <CustomSelect
                   value={form.format}
                   options={FORMAT_OPTIONS}
@@ -2974,6 +3238,7 @@ export default function App() {
                   setSettingsOpen(true);
                 }}
                 requestArt={requestArt}
+                onNotify={(message) => notify(message, { kind: "success", duration: 4000 })}
                 setPanelHost={setPanelHostNode}
                 showPanelVideo={isVideoEngineInPanel}
                 onToggleFullscreen={() => setVideoDisplayMode("fullscreen")}
@@ -2995,47 +3260,52 @@ export default function App() {
                   </div>
                   <div className="about-row">
                     <dt>Développeur</dt>
-                    <dd>Ghost Face</dd>
+                    <dd>Ghost Industry</dd>
                   </div>
                   <div className="about-row">
                     <dt>Droits</dt>
-                    <dd>© {new Date().getFullYear()} Ghost Face. Tous droits réservés.</dd>
+                    <dd>© {new Date().getFullYear()} Ghost Industry. Tous droits réservés.</dd>
                   </div>
                 </dl>
-                <div className="about-update" aria-live="polite">
-                  <p className="about-update__status">
-                    {updateState.status === "checking" && "Recherche de mises à jour..."}
-                    {updateState.status === "uptodate" &&
-                      (updateState.message || "RapidTunes est à jour.")}
-                    {updateState.status === "available" &&
-                      `Nouvelle version disponible : ${updateState.info.version} (actuelle : ${APP_VERSION})`}
-                    {updateState.status === "downloading" && "Téléchargement de la mise à jour..."}
-                    {updateState.status === "ready" && "Mise à jour téléchargée. Prête à être installée."}
-                    {updateState.status === "error" && updateState.message}
-                    {updateState.status === "idle" && "Vérifie si une nouvelle version est disponible."}
-                  </p>
-                  <div className="about-update__actions">
-                    {updateState.status === "available" ? (
-                      <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleDownloadUpdate}>
-                        Télécharger la mise à jour
-                      </button>
-                    ) : null}
-                    {updateState.status === "ready" ? (
-                      <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleInstallUpdate}>
-                        Installer et redémarrer
-                      </button>
-                    ) : null}
-                    {updateState.status !== "downloading" && updateState.status !== "ready" ? (
-                      <button
-                        type="button"
-                        className="about-update__btn"
-                        onClick={() => handleCheckUpdate()}
-                        disabled={updateState.status === "checking"}
-                      >
-                        Rechercher des mises à jour
-                      </button>
-                    ) : null}
-                  </div>
+                {renderUpdatePanel()}
+                <div className="changelog" aria-live="polite">
+                  <h3 className="changelog__title">Journal des modifications</h3>
+                  {changelog.status === "loading" ? <p className="changelog__empty">Chargement...</p> : null}
+                  {changelog.status === "error" ? (
+                    <p className="changelog__empty">
+                      {changelog.message}{" "}
+                      <button type="button" className="about-update__btn" onClick={loadChangelog}>Réessayer</button>
+                    </p>
+                  ) : null}
+                  {changelog.status === "ready" && changelog.releases.length === 0 ? (
+                    <p className="changelog__empty">Aucune version publiée pour le moment.</p>
+                  ) : null}
+                  {changelog.releases.map((release) => (
+                    <article key={release.version} className="changelog__release">
+                      <header className="changelog__head">
+                        <strong>Version {release.version}</strong>
+                        {release.version === APP_VERSION ? <span className="changelog__badge">Installée</span> : null}
+                        {release.prerelease ? <span className="changelog__badge">Pré-version</span> : null}
+                        {release.date ? (
+                          <time dateTime={release.date}>{new Date(release.date).toLocaleDateString("fr-FR")}</time>
+                        ) : null}
+                      </header>
+                      {release.sections.length === 0 ? (
+                        <p className="changelog__empty">Aucune note pour cette version.</p>
+                      ) : (
+                        release.sections.map((section, index) => (
+                          <div key={`${section.title}-${index}`} className="changelog__section">
+                            {section.title ? <h4>{section.title}</h4> : null}
+                            <ul>
+                              {section.items.map((item, itemIndex) => (
+                                <li key={itemIndex}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))
+                      )}
+                    </article>
+                  ))}
                 </div>
               </section>
             ) : null}
@@ -3140,10 +3410,34 @@ export default function App() {
                           </div>
                           <p className="queue-topheader-meta__status">{currentHeaderStatusText}</p>
                           <div className="queue-topheader-progress">
+                            {currentQueueItem ? (
+                              <button
+                                type="button"
+                                className="queue-btn queue-btn-ghost queue-btn-image queue-btn-control"
+                                onClick={handleTogglePauseCurrent}
+                                disabled={!loading || isPauseActionPending}
+                                aria-label={isCurrentPaused ? "Reprendre" : "Mettre en pause"}
+                                title={isCurrentPaused ? "Reprendre" : "Mettre en pause"}
+                              >
+                                <img src={isCurrentPaused ? playIcon : pauseIcon} alt="" className="queue-btn-image__img" />
+                              </button>
+                            ) : null}
                             <div className={`queue-topheader-progress__track ${isCurrentIndeterminate ? "indeterminate" : ""}`}>
                               <span style={isCurrentIndeterminate ? undefined : { width: `${currentHeaderProgress}%` }} />
                             </div>
                             <span className="queue-topheader-progress__value">{currentHeaderPercentText}</span>
+                            {currentQueueItem ? (
+                              <button
+                                type="button"
+                                className="queue-btn queue-btn-ghost queue-btn-image"
+                                onClick={handleCancelCurrent}
+                                disabled={!loading}
+                                aria-label="Annuler le téléchargement"
+                                title="Annuler"
+                              >
+                                <img src={stopIcon} alt="" className="queue-btn-image__img" />
+                              </button>
+                            ) : null}
                           </div>
                           <p className="queue-topheader-meta__eta">{currentHeaderEtaText}</p>
                         </div>
@@ -3151,96 +3445,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="queue-section-body">
-                  {currentQueueItem ? (
-                    <div className="queue-current-item queue-surface">
-                    <div className="queue-item-main">
-                      <div className="queue-media-top">
-                        {showQueueThumbnails && (currentQueueItem.preview?.thumbnail_url ? (
-                          <img
-                            src={currentQueueItem.preview.thumbnail_url}
-                            alt={currentQueueItem.preview?.title ?? "Aperçu média"}
-                            className="queue-media-thumb"
-                          />
-                        ) : (
-                          <QueuePlaceholderThumb isPlaylist={Boolean(currentQueueItem.preview?.is_playlist)} />
-                        ))}
-
-                        <div className="queue-media-content">
-                          <div className="queue-item-title-row">
-                            <p className="queue-item-title">
-                              {formatMediaTitleLine(currentQueueItem.preview, currentQueueItem.form.url)}
-                            </p>
-                            <DurationInline durationText={currentQueueItem.preview?.duration_text} className="duration-inline--queue" />
-                          </div>
-                          {showQueueMeta && (
-                            <div className="queue-history-meta" role="list" aria-label="Détails du média actif">
-                              <span className="queue-history-chip" role="listitem">{currentQueueItem.form.format.toUpperCase()}</span>
-                              <span className="queue-history-chip" role="listitem">{formatDisplayValue(currentQueueItem.form.quality)}</span>
-                              {currentRateLimitLabel ? (
-                                <span className="queue-history-chip" role="listitem">Limite {currentRateLimitLabel}</span>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="queue-item-progress-block">
-                        <div className="queue-item-progress-head">
-                          <strong>
-                            {isCurrentPaused ? "En pause" : formatProgressPhase(currentQueueItem.phase)}
-                            {currentDownloadSpeedLabel && currentQueueItem.phase === "downloading"
-                              ? ` • ${currentDownloadSpeedLabel}`
-                              : ""}
-                          </strong>
-                          <span>{currentHeaderPercentText}</span>
-                        </div>
-
-                        <div className="queue-item-progress-row">
-                          <button
-                            type="button"
-                            className="queue-btn queue-btn-ghost queue-btn-image queue-btn-control"
-                            onClick={handleTogglePauseCurrent}
-                            disabled={!loading || isPauseActionPending}
-                            aria-label={isCurrentPaused ? "Reprendre" : "Mettre en pause"}
-                            title={isCurrentPaused ? "Reprendre" : "Mettre en pause"}
-                          >
-                            <img
-                              src={isCurrentPaused ? playIcon : pauseIcon}
-                              alt=""
-                              className="queue-btn-image__img"
-                            />
-                          </button>
-
-                          <div className={`queue-item-progress-track ${currentQueueProgress === null ? "indeterminate" : ""}`}>
-                            <span
-                              style={
-                                currentQueueProgress === null
-                                  ? undefined
-                                  : { width: `${currentQueueProgress}%` }
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="queue-item-right queue-item-right--current">
-                      <div className="queue-item-actions queue-item-actions--single">
-                      <button
-                        type="button"
-                        className="queue-btn queue-btn-ghost queue-btn-image"
-                        onClick={handleCancelCurrent}
-                        disabled={!loading}
-                        aria-label="Annuler le téléchargement"
-                        title="Annuler"
-                      >
-                        <img src={stopIcon} alt="" className="queue-btn-image__img" />
-                      </button>
-                      </div>
-                    </div>
-                  </div>
-                  ) : null}
-                  </div>
                 </section>
 
                 <div className="queue-secondary-scroll">
@@ -3528,7 +3732,7 @@ export default function App() {
               className="media-player-btn media-player-btn--play"
               onClick={engine.toggle}
               aria-label={isAudioPlaying ? "Mettre en pause" : "Lire"}
-              title={isAudioPlaying ? "Pause" : "Lecture"}
+              title={isAudioPlaying ? "Pause (Espace)" : "Lecture (Espace)"}
             >
               <PlayerIcon name={isAudioPlaying ? "pause" : "play"} />
             </button>
@@ -3691,8 +3895,12 @@ export default function App() {
               </header>
               <dl className="about-list">
                 <div className="about-row"><dt>Titre</dt><dd>{playingLibraryMedia.title}</dd></div>
-                <div className="about-row"><dt>Artiste</dt><dd>{playingLibraryMedia.artist}</dd></div>
-                <div className="about-row"><dt>Album</dt><dd>{playingLibraryMedia.album}</dd></div>
+                {playingLibraryMedia.type === "video" && playingLibraryMedia.artist === "Artiste inconnu" ? null : (
+                  <div className="about-row"><dt>Artiste</dt><dd>{playingLibraryMedia.artist}</dd></div>
+                )}
+                {playingLibraryMedia.type === "video" && playingLibraryMedia.album === "Album inconnu" ? null : (
+                  <div className="about-row"><dt>Album</dt><dd>{playingLibraryMedia.album}</dd></div>
+                )}
                 <div className="about-row"><dt>Type</dt><dd>{playingLibraryMedia.type === "video" ? "Vidéo" : "Musique"}</dd></div>
                 <div className="about-row"><dt>Format</dt><dd>{playingLibraryMedia.extension.toUpperCase()}</dd></div>
                 <div className="about-row"><dt>Durée</dt><dd>{audioPlayerDuration}</dd></div>
@@ -3787,6 +3995,7 @@ export default function App() {
                 className="settings-close-btn"
                 onClick={() => setSettingsOpen(false)}
                 aria-label="Fermer les paramètres"
+                title="Fermer les paramètres"
               >
                 <img src={windowCloseIcon} alt="" className="window-btn-icon" />
               </button>
@@ -3813,7 +4022,7 @@ export default function App() {
                   <section className="settings-block">
                     <label className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
-                        <strong>Action du bouton Réduire</strong>
+                        <strong>Bouton « Réduire »</strong>
                         <small>Active une action personnalisée quand tu cliques sur Réduire.</small>
                       </div>
                       <span className="settings-switch">
@@ -3856,7 +4065,7 @@ export default function App() {
                   <section className="settings-block">
                     <label className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
-                        <strong>Action du bouton Fermer</strong>
+                        <strong>Bouton « Fermer »</strong>
                         <small>Active une action personnalisée quand tu cliques sur Fermer.</small>
                       </div>
                       <span className="settings-switch">
@@ -4032,44 +4241,6 @@ export default function App() {
                     "Mini lecteur toujours au premier plan",
                     "Garde le mini lecteur au-dessus des autres fenêtres."
                   )}
-                  <section className="settings-block">
-                    <label className="settings-field">
-                      <span>Visualisation pendant la lecture d'une musique</span>
-                      <select
-                        value={visualizerMode}
-                        onChange={(event) => updateSetting("playerVisualizer", event.target.value)}
-                      >
-                        {VISUALIZER_MODES.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="settings-field">
-                      <span>Couleur de la visualisation</span>
-                      <select
-                        value={settings.playerVisualizerColor}
-                        onChange={(event) => updateSetting("playerVisualizerColor", event.target.value)}
-                      >
-                        {VISUALIZER_COLORS.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {settings.playerVisualizerColor === "custom" ? (
-                      <label className="settings-field">
-                        <span>Couleur personnalisée</span>
-                        <input
-                          type="color"
-                          value={settings.playerVisualizerCustomColor}
-                          onChange={(event) => updateSetting("playerVisualizerCustomColor", event.target.value)}
-                        />
-                      </label>
-                    ) : null}
-                  </section>
                   {renderSettingToggle(
                     "playerShowCovers",
                     "Afficher les pochettes et miniatures",
@@ -4250,10 +4421,8 @@ export default function App() {
                         </span>
                       </span>
                     </label>
-                  </section>
 
-                  <section className="settings-block">
-                    <label className="settings-field settings-field-inline">
+                    <label className="settings-field settings-field-inline" style={{ marginTop: 12 }}>
                       <span>Débit maximal</span>
                       <div className="settings-input-with-unit">
                         <input
@@ -4272,6 +4441,13 @@ export default function App() {
                 </div>
               ) : activeSettingsTab === "updates" ? (
                 <div className="settings-stack">
+                  <section className="settings-block">
+                    <div className="settings-card-head">
+                      <h3>Version installée : {APP_VERSION}</h3>
+                    </div>
+                    {renderUpdatePanel()}
+                  </section>
+
                   <section className="settings-block">
                     <label className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
@@ -4295,7 +4471,7 @@ export default function App() {
                     <label className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Mises à jour automatiques de l'application</strong>
-                        <small>Active ou désactive l'installation automatique des nouvelles versions.</small>
+                        <small>Télécharge automatiquement les nouvelles versions ; l'installation reste à valider.</small>
                       </div>
                       <span className="settings-switch">
                         <input
@@ -4320,6 +4496,7 @@ export default function App() {
           </section>
         </div>
       )}
+      <ToastLayer toasts={toasts} onDismiss={dismissToast} />
       <TooltipLayer />
     </main>
   );

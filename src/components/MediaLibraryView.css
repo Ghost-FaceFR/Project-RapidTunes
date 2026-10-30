@@ -150,7 +150,7 @@
   display: flex;
   align-items: baseline;
   gap: 16px;
-  padding: 10px 16px 6px;
+  padding: 8px 16px 4px;
 }
 
 .mlv-head h2 {
@@ -209,7 +209,7 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 6px 12px 12px;
+  padding: 2px 12px 8px;
 }
 
 .mlv-btn {
@@ -238,7 +238,7 @@
 .mlv-btn--primary {
   border-color: transparent;
   background: linear-gradient(135deg, var(--neon-1, #7f7f7f), var(--neon-2, #969696));
-  color: #0c0c0c;
+  color: #fff;
   font-weight: 600;
 }
 
@@ -247,14 +247,14 @@
 }
 
 .mlv-btn--primary .player-icon-img {
-  filter: brightness(0);
+  filter: brightness(0) invert(1);
 }
 
 .mlv-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px 0 10px;
+  margin: 0 0 6px;
   flex-wrap: wrap;
 }
 
@@ -338,7 +338,7 @@
 }
 
 .mlv-group h5 {
-  margin: 12px 0 4px 6px;
+  margin: 8px 0 2px 6px;
   color: var(--neon-1, #969696);
   font-size: 1rem;
   font-weight: 500;
@@ -855,7 +855,7 @@
   border-radius: 4px;
   border: 1px solid var(--theme-text-3, #a7a7a7);
   background: color-mix(in srgb, var(--theme-bg-1, #101010) 70%, transparent);
-  color: #0c0c0c;
+  color: #fff;
   cursor: pointer;
 }
 
@@ -932,9 +932,11 @@
 
 .mlv-eq i {
   flex: 1 1 0;
-  height: 35%;
+  height: 100%;
   border-radius: 1px;
   background: var(--neon-1, #969696);
+  transform: scaleY(0.35);
+  transform-origin: bottom;
 }
 
 .mlv-eq.is-active i {
@@ -950,8 +952,8 @@
 }
 
 @keyframes mlv-eq-bounce {
-  0%, 100% { height: 25%; }
-  50% { height: 100%; }
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
 }
 
 @media (max-width: 1100px) {
@@ -1704,6 +1706,25 @@
   animation: rt-tooltip-in 0.12s ease-out;
 }
 
+.rt-tooltip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+}
+
+.rt-tooltip__kbd {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--theme-line-3, #4a4a4a);
+  background: var(--theme-bg-1, #101010);
+  color: var(--theme-text-3, #a7a7a7);
+  font-family: inherit;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
 .rt-tooltip--below {
   transform: translate(-50%, 0);
 }
@@ -1765,8 +1786,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  min-height: 28px;
-  margin-bottom: 2px;
+  min-height: 26px;
+  margin-bottom: 0;
   border-bottom: 1px solid var(--theme-line-2, #3a3a3a);
   border-radius: 0;
   background: var(--theme-bg-1, #101010);

@@ -64,6 +64,20 @@ pub struct DownloadProgressEvent {
   pub rate_limit_kibps: Option<f64>
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+  pub video_id: String,
+  pub url: String,
+  pub title: String,
+  pub channel: Option<String>,
+  pub duration_seconds: Option<u64>,
+  pub duration_text: Option<String>,
+  pub view_count: Option<u64>,
+  pub thumbnail_url: Option<String>,
+  pub is_live: bool
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MediaPreview {
   pub url: String,

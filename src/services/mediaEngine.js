@@ -54,7 +54,7 @@ export function useMediaEngine({ source, speed, volume, muted, eqEnabled, eqGain
         previous = filter;
       });
       const analyser = context.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = 1024;
       analyser.smoothingTimeConstant = 0.8;
       previous.connect(analyser);
       analyser.connect(context.destination);
@@ -68,7 +68,11 @@ export function useMediaEngine({ source, speed, volume, muted, eqEnabled, eqGain
     if (!element) return undefined;
 
     const handlers = {
-      timeupdate: () => setCurrentTime(element.currentTime || 0),
+      // Limite les re-rendus de l'app (timeupdate ~4/s): une mise à jour toutes les 0,5 s suffit.
+      timeupdate: () => {
+        const time = element.currentTime || 0;
+        setCurrentTime((previous) => (Math.abs(time - previous) >= 0.5 ? time : previous));
+      },
       durationchange: () => setDuration(Number.isFinite(element.duration) ? element.duration : 0),
       loadedmetadata: () => setDuration(Number.isFinite(element.duration) ? element.duration : 0),
       play: () => {
