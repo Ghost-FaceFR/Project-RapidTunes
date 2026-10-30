@@ -1809,3 +1809,14 @@
   color: inherit;
   font-weight: inherit;
 }
+
+/* Pochettes rondes (artistes): la case à cocher doit rester à l'intérieur du cercle, pas dans l'angle coupé. */
+.mlv-card__art--round .mlv-card__check {
+  top: 14%;
+  left: 14%;
+  z-index: 2;
+}
+
+.mlv-card__art--round .mlv-check {
+  background: color-mix(in srgb, var(--theme-bg-1, #101010) 85%, transparent);
+}

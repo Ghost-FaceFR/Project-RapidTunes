@@ -112,11 +112,64 @@ where
     .await
 }
 
+/// Télécharge; si Windows refuse l'écriture dans le dossier choisi (« Accès contrôlé aux dossiers »),
+/// relance automatiquement dans un dossier non protégé (Téléchargements\RapidTunes) et le signale.
 pub async fn process_download_request_with_progress_and_control<F, G, H>(
-  mut request: DownloadRequest,
+  request: DownloadRequest,
   mut emit_progress: F,
   mut set_active_pid: G,
   mut is_cancel_requested: H
+) -> AppResult<JobResult>
+where
+  F: FnMut(DownloadProgressEvent) -> AppResult<()>,
+  G: FnMut(Option<u32>) -> AppResult<()>,
+  H: FnMut() -> bool
+{
+  let first = run_download_once(
+    request.clone(),
+    &mut emit_progress,
+    &mut set_active_pid,
+    &mut is_cancel_requested
+  )
+  .await;
+
+  let denied = matches!(&first, Err(AppError::CommandFailed(message)) if is_access_denied(message));
+  if !denied {
+    return first;
+  }
+  let Some(fallback) = fallback_output_dir(request.output_dir.as_deref()) else {
+    return first;
+  };
+
+  let fallback_text = fallback.to_string_lossy().to_string();
+  let _ = fs::create_dir_all(&fallback);
+  let mut retry_request = request;
+  retry_request.output_dir = Some(fallback_text.clone());
+  let retried = run_download_once(
+    retry_request,
+    &mut emit_progress,
+    &mut set_active_pid,
+    &mut is_cancel_requested
+  )
+  .await;
+
+  match retried {
+    Ok(mut result) => {
+      result.message = format!(
+        "{} Windows protège le dossier choisi : le fichier a été enregistré dans {fallback_text}.",
+        result.message
+      );
+      Ok(result)
+    }
+    Err(_) => first
+  }
+}
+
+async fn run_download_once<F, G, H>(
+  mut request: DownloadRequest,
+  mut emit_progress: &mut F,
+  set_active_pid: &mut G,
+  is_cancel_requested: &mut H
 ) -> AppResult<JobResult>
 where
   F: FnMut(DownloadProgressEvent) -> AppResult<()>,
@@ -780,7 +833,39 @@ fn compact_output(stderr: &str) -> String {
     .find(|line| !line.trim().is_empty())
     .unwrap_or("Erreur inconnue.");
 
-  compact.chars().take(240).collect()
+  with_access_hint(compact.chars().take(240).collect())
+}
+
+pub(crate) fn is_access_denied(message: &str) -> bool {
+  let lower = message.to_lowercase();
+  ["permission denied", "access is denied", "accès refusé", "errno 13", "os error 5"]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+/// Dossier de repli non protégé par « Accès contrôlé aux dossiers »: Téléchargements\RapidTunes.
+fn fallback_output_dir(current: Option<&str>) -> Option<PathBuf> {
+  let fallback = dirs::download_dir()?.join("RapidTunes");
+  let same = current
+    .map(|dir| Path::new(dir.trim()) == fallback.as_path())
+    .unwrap_or(false);
+  (!same).then_some(fallback)
+}
+
+/// Ajoute une explication quand Windows refuse l'écriture (souvent la protection « Accès contrôlé aux dossiers »).
+pub(crate) fn with_access_hint(message: String) -> String {
+  let lower = message.to_lowercase();
+  let denied = ["permission denied", "access is denied", "accès refusé", "errno 13", "os error 5"]
+    .iter()
+    .any(|needle| lower.contains(needle));
+  if !denied {
+    return message;
+  }
+  format!(
+    "{message} Windows bloque peut-être l'écriture dans ce dossier (protection « Accès contrôlé aux dossiers »). \
+Dans Sécurité Windows > Protection contre les virus et menaces > Protection contre les ransomwares, \
+autorise RapidTunes (et yt-dlp / ffmpeg) ou choisis un autre dossier."
+  )
 }
 
 fn validate_preview_url(url: &str) -> AppResult<()> {

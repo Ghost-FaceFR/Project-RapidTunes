@@ -339,7 +339,9 @@ pub fn write_tags(update: &MediaTagsUpdate) -> Result<(), String> {
 
   tagged
     .save_to_path(path, WriteOptions::default())
-    .map_err(|err| format!("Impossible d'enregistrer (fichier utilisé ?): {err}"))
+    .map_err(|err| {
+      crate::services::media_service::with_access_hint(format!("Impossible d'enregistrer (fichier utilisé ?): {err}"))
+    })
 }
 
 /// Analyse une liste de fichiers précis (ouverture directe, hors bibliothèque).

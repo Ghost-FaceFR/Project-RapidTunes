@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## 0.2.2 - 30 octobre 2026
+
+### Corrections
+- Si Windows protège le dossier de destination (« Accès contrôlé aux dossiers »), le téléchargement est automatiquement relancé dans `Téléchargements\RapidTunes` et l'application l'indique, au lieu d'échouer.
+- Le message d'erreur explique la protection de Windows et comment autoriser RapidTunes quand l'écriture est refusée (téléchargement ou enregistrement des tags).
+- Vue Artistes : la case de sélection est dans le cercle de la pochette au lieu d'être rognée dans l'angle.
+
 ## 0.2.1 - 30 octobre 2026
 
 ### Corrections
