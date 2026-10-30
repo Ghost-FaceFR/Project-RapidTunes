@@ -3059,10 +3059,7 @@ export default function App() {
         <header className="titlebar" data-tauri-drag-region onMouseDown={handleStartDragging}>
           <div className="titlebar-hit-zone" onMouseDown={handleStartDragging} aria-hidden="true" />
           <div className="titlebar-drag" data-tauri-drag-region onMouseDown={handleStartDragging}>
-            <h1 className="titlebar-brand">
-              <img className="titlebar-logo" src={appLogo} alt="" draggable="false" />
-              RapidTunes
-            </h1>
+            <h1>RapidTunes</h1>
             <div className="titlebar-nav-shell" onMouseDown={stopDragPropagation}>
               <nav className="titlebar-tabs" aria-label="Navigation principale">
                 <button

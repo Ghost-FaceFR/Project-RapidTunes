@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.2.5 - 30 octobre 2026
+
+### Améliorations
+- Le logo n'est plus affiché dans la barre de titre de la fenêtre (il reste dans « À propos », l'icône de l'application et la barre des tâches).
+
 ## 0.2.4 - 30 octobre 2026
 
 ### Améliorations
