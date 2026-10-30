@@ -4272,7 +4272,6 @@ body {
   width: 0;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--neon-1, #7f7f7f) 0%, var(--neon-2, #969696) 55%, var(--neon-3, #b0b0b0) 100%);
-  transition: width 0.22s ease;
 }
 
 .media-player-bar__track > span::after {

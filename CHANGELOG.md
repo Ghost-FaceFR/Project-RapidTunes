@@ -1,9 +1,15 @@
 # Journal des modifications
 
+## 0.2.8 - 30 octobre 2026
+
+### Améliorations
+- Performances : la barre de progression du lecteur n'anime plus sa largeur à chaque mise à jour, ce qui réduit nettement la consommation CPU de WebView2 pendant la lecture (mesuré sur un banc de test : environ 9 % → 2 à 4 % d'un cœur).
+- Page « À propos » : seule la version est affichée ; la recherche de mise à jour reste dans Paramètres → Mises à jour.
+
 ## 0.2.7 - 30 octobre 2026
 
 ### Améliorations
-- Page « À propos » centrée : logo, nom, version, développeur et copyright, puis la mise à jour et le journal des modifications en dessous.
+- Page « À propos » centrée : logo, nom, version, développeur et copyright, puis le journal des modifications en dessous.
 - Les listes déroulantes natives de Windows (Paramètres, égaliseur) sont remplacées par les menus de l'application.
 - La bulle de validation native du navigateur (champ « Lien ou recherche » vide) est remplacée par une notification de l'application.
 - Journal des modifications : chaque version se déplie et se replie, repliées par défaut.

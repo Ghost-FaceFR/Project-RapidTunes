@@ -3306,7 +3306,6 @@ export default function App() {
                 <p className="about-version">Version {APP_VERSION}</p>
                 <p className="about-credit">Développé par <strong>Ghost Face</strong></p>
                 <p className="about-copyright">© {new Date().getFullYear()} Ghost Industry. Tous droits réservés.</p>
-                {renderUpdatePanel()}
                 </div>
                 <div className="about-col about-col--changelog">
                 <div className="changelog" aria-live="polite">
