@@ -1,5 +1,15 @@
 # Journal des modifications
 
+## 0.2.4 - 30 octobre 2026
+
+### Améliorations
+- Le logo s'affiche dans la barre de titre, à gauche du nom de l'application.
+- L'icône de la fenêtre et de la barre des tâches utilise le fichier `.ico` complet (toutes les tailles) au lieu d'une miniature 32 px.
+
+### Corrections
+- Media DL : une fois la file terminée, la carte du haut ne montre plus le dernier média en « En attente » : le champ et l'aperçu sont vidés.
+- Media DL : les boutons pause/reprise et annuler sont maintenant côte à côte, à droite de la barre de progression.
+
 ## 0.2.3 - 30 octobre 2026
 
 ### Nouveautés

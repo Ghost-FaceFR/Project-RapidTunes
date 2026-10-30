@@ -1594,6 +1594,11 @@ export default function App() {
       setResultMessage(summary);
     }
 
+    // File terminée : on repart d'un état vide (plus d'aperçu du média déjà téléchargé).
+    if (completedCount > 0) {
+      setForm((prev) => ({ ...prev, url: "" }));
+    }
+
     setLoading(false);
     cancelRequestedRef.current = false;
     setIsCurrentPaused(false);
@@ -3054,7 +3059,10 @@ export default function App() {
         <header className="titlebar" data-tauri-drag-region onMouseDown={handleStartDragging}>
           <div className="titlebar-hit-zone" onMouseDown={handleStartDragging} aria-hidden="true" />
           <div className="titlebar-drag" data-tauri-drag-region onMouseDown={handleStartDragging}>
-            <h1>RapidTunes</h1>
+            <h1 className="titlebar-brand">
+              <img className="titlebar-logo" src={appLogo} alt="" draggable="false" />
+              RapidTunes
+            </h1>
             <div className="titlebar-nav-shell" onMouseDown={stopDragPropagation}>
               <nav className="titlebar-tabs" aria-label="Navigation principale">
                 <button
@@ -3426,6 +3434,10 @@ export default function App() {
                           </div>
                           <p className="queue-topheader-meta__status">{currentHeaderStatusText}</p>
                           <div className="queue-topheader-progress">
+                            <div className={`queue-topheader-progress__track ${isCurrentIndeterminate ? "indeterminate" : ""}`}>
+                              <span style={isCurrentIndeterminate ? undefined : { width: `${currentHeaderProgress}%` }} />
+                            </div>
+                            <span className="queue-topheader-progress__value">{currentHeaderPercentText}</span>
                             {currentQueueItem ? (
                               <button
                                 type="button"
@@ -3438,10 +3450,6 @@ export default function App() {
                                 <img src={isCurrentPaused ? playIcon : pauseIcon} alt="" className="queue-btn-image__img" />
                               </button>
                             ) : null}
-                            <div className={`queue-topheader-progress__track ${isCurrentIndeterminate ? "indeterminate" : ""}`}>
-                              <span style={isCurrentIndeterminate ? undefined : { width: `${currentHeaderProgress}%` }} />
-                            </div>
-                            <span className="queue-topheader-progress__value">{currentHeaderPercentText}</span>
                             {currentQueueItem ? (
                               <button
                                 type="button"

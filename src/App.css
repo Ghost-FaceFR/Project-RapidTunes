@@ -5933,3 +5933,17 @@ body {
   object-fit: contain;
   flex: none;
 }
+
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.titlebar-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: none;
+  pointer-events: none;
+}
