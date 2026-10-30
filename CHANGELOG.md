@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.2.3 - 30 octobre 2026
+
+### Nouveautés
+- Nouveau logo : icône de l'application (fenêtre, barre des tâches, raccourcis, installateur) et affichage à côté du nom dans « À propos ».
+
+### Corrections
+- Téléchargement vers un dossier protégé par « Accès contrôlé aux dossiers » : l'erreur trompeuse « [Errno 2] No such file or directory » est maintenant reconnue et le téléchargement est relancé automatiquement dans `Téléchargements\RapidTunes`.
+
 ## 0.2.2 - 30 octobre 2026
 
 ### Corrections

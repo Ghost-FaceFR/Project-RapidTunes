@@ -5920,3 +5920,16 @@ body {
 .boot-error__actions button:hover {
   background: #272727;
 }
+
+.about-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex: none;
+}

@@ -838,9 +838,18 @@ fn compact_output(stderr: &str) -> String {
 
 pub(crate) fn is_access_denied(message: &str) -> bool {
   let lower = message.to_lowercase();
-  ["permission denied", "access is denied", "accès refusé", "errno 13", "os error 5"]
-    .iter()
-    .any(|needle| lower.contains(needle))
+  // « [Errno 2] No such file » : l'accès contrôlé aux dossiers fait échouer la création du fichier
+  // d'une façon qui ressemble à un fichier manquant.
+  [
+    "permission denied",
+    "access is denied",
+    "accès refusé",
+    "errno 13",
+    "os error 5",
+    "errno 2] no such file"
+  ]
+  .iter()
+  .any(|needle| lower.contains(needle))
 }
 
 /// Dossier de repli non protégé par « Accès contrôlé aux dossiers »: Téléchargements\RapidTunes.
@@ -854,11 +863,7 @@ fn fallback_output_dir(current: Option<&str>) -> Option<PathBuf> {
 
 /// Ajoute une explication quand Windows refuse l'écriture (souvent la protection « Accès contrôlé aux dossiers »).
 pub(crate) fn with_access_hint(message: String) -> String {
-  let lower = message.to_lowercase();
-  let denied = ["permission denied", "access is denied", "accès refusé", "errno 13", "os error 5"]
-    .iter()
-    .any(|needle| lower.contains(needle));
-  if !denied {
+  if !is_access_denied(&message) {
     return message;
   }
   format!(

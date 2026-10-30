@@ -48,6 +48,7 @@ import stopIcon from "./assets/images/components/stop.png";
 import timeIcon from "./assets/images/components/time.png";
 import musicIcon from "./assets/images/components/music.png";
 import musicAlbumIcon from "./assets/images/components/music_album.png";
+import appLogo from "./assets/logo.png";
 
 const FORMAT_OPTIONS = ["mp3", "mp4", "wav", "flac", "aac"];
 const MP4_AUDIO_OPTIONS = ["96kbps", "128kbps", "192kbps", "256kbps", "320kbps"];
@@ -3260,7 +3261,10 @@ export default function App() {
               <section className="about-panel" aria-label="À propos de RapidTunes">
                 <div className="about-layout">
                 <div className="about-col about-col--info">
-                <h2>RapidTunes</h2>
+                <h2 className="about-title">
+                  <img className="about-logo" src={appLogo} alt="" draggable="false" />
+                  RapidTunes
+                </h2>
                 <dl className="about-list">
                   <div className="about-row">
                     <dt>Version</dt>
