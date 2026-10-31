@@ -100,7 +100,7 @@ echo.
 echo Une nouvelle invite de commande va s'ouvrir.
 call :print_debug_urls
 call :print_running_style "Ouverture d'une console debug dédiée..."
-start "RapidTunes Debug CMD" cmd /k "cd /d ""%~dp0"" ^& set RAPIDTUNES_NO_AUTO_BROWSER=1 ^& call ""%RAPIDTUNES_SCRIPT_NAME%"" web"
+start "RapidTunes Debug CMD" cmd /k "cd /d ""%~dp0"" ^& call ""%RAPIDTUNES_SCRIPT_NAME%"" web"
 goto :post_action
 
 :run_web
@@ -116,13 +116,8 @@ if errorlevel 1 goto :failure
 call :ensure_node_modules
 if errorlevel 1 goto :failure
 
-if defined RAPIDTUNES_NO_AUTO_BROWSER (
-  echo [INFO] Ouverture auto du navigateur désactivée.
-  echo [INFO] URL de test: %RAPIDTUNES_DEBUG_URL%
-) else (
-  echo [INFO] Ouverture du lien localhost dans le navigateur système...
-  start "" "%RAPIDTUNES_DEBUG_URL%"
-)
+echo [INFO] Le navigateur ne sera pas ouvert automatiquement.
+echo [INFO] URL de test: %RAPIDTUNES_DEBUG_URL%
 
 call :print_running_style "Démarrage du serveur Vite (debug)..."
 echo [RUN] Appuie sur Ctrl+C pour arrêter le serveur.
