@@ -8,7 +8,7 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-stable-000000?logo=rust&logoColor=white)
 ![Plateforme](https://img.shields.io/badge/Windows-10%2F11-0078D6?logo=windows&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.4-6C5CE7)
+![Version](https://img.shields.io/badge/version-1.2.0-6C5CE7)
 
 </div>
 
@@ -130,7 +130,7 @@ rapidtunes.bat        Lanceur Windows
 1. Augmenter la version dans `package.json`, `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`.
 2. Compléter `CHANGELOG.md`.
 3. Compiler : `powershell -File scripts/build-release.ps1` (produit dans `release\` l'installateur RapidTunes `RapidTunes_<version>_x64-setup.exe`, dont l'interface est dans `installer\`, et l'installateur NSIS classique `RapidTunes_<version>_x64-classic.exe`).
-4. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`), dont le texte reprend la section du `CHANGELOG.md` (il alimente le journal des modifications de l'application), et y joindre les deux installateurs (`-setup.exe`, utilisé par la mise à jour automatique, et `-classic.exe`).
+4. Créer une *Release* GitHub dont le tag est la version (ex. `v1.2.0`), dont le texte reprend la section du `CHANGELOG.md` (il alimente le journal des modifications de l'application), et y joindre les deux installateurs (`-setup.exe`, utilisé par la mise à jour automatique, et `-classic.exe`).
 
 L'application compare le tag de la dernière release à sa version et propose la mise à jour si elle est plus récente.
 

@@ -1,7 +1,7 @@
 {
   "name": "rapidtunes",
   "private": true,
-  "version": "0.2.4",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-autostart": "^2.7.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tauri": "^0.15.0"

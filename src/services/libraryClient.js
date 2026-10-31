@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { demoMediaUrl, isWebDebug } from "./webDebug";
 
 export async function scanLibrary(folders, recursive = true, kind = "all") {
   return invoke("scan_library", { folders, recursive, kind });
@@ -13,6 +14,7 @@ export async function getVideoThumbnail(path) {
 }
 
 export function toMediaUrl(path) {
+  if (isWebDebug() && String(path).startsWith("demo://")) return demoMediaUrl(path);
   return convertFileSrc(path);
 }
 

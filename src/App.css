@@ -6228,3 +6228,68 @@ body {
   max-height: 280px;
   overflow-y: auto;
 }
+
+/* Mini lecteur: boutons réduits + volume */
+.media-mini-player {
+  padding: 6px 8px 8px;
+}
+
+.media-mini-player .media-player-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.media-mini-player .media-player-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.media-mini-player .media-player-btn--play {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border-width: 1.5px;
+}
+
+.media-mini-player .media-player-btn--play svg {
+  width: 13px;
+  height: 13px;
+}
+
+.media-mini-player__controls {
+  gap: 10px;
+}
+
+.media-mini-player__foot {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 6px;
+}
+
+.media-mini-player__volume {
+  gap: 2px;
+}
+
+.media-mini-player__volume .media-player-volume__slider {
+  width: 64px;
+}
+
+/* Pas de cadre de focus (« overlay ») sur les curseurs et boutons quand on les utilise au clavier (flèches...). */
+input[type="range"],
+input[type="range"]:focus,
+input[type="range"]:focus-visible,
+.media-player-btn:focus,
+.media-player-btn:focus-visible,
+.media-player-volume__slider:focus,
+.media-player-volume__slider:focus-visible,
+.eq-slider:focus,
+.eq-slider:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.media-player-volume,
+.media-player-bar,
+.media-mini-player {
+  -webkit-tap-highlight-color: transparent;
+}

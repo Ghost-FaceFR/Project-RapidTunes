@@ -1,6 +1,6 @@
 # Journal des modifications
 
-## 0.2.4 - 31 octobre 2026
+## 1.2.0 - 31 octobre 2026
 
 ### Nouveautés
 - Nouvel installateur aux couleurs de RapidTunes : options d'installation, progression étape par étape, désinstallation avec suppression des données au choix.
@@ -27,7 +27,7 @@
 - Zone de clic des interrupteurs limitée au bouton.
 - Menus du mini lecteur et de l'égaliseur ne sont plus coupés.
 
-## 0.2.3 - 30 octobre 2026
+## 1.1.0 - 30 octobre 2026
 
 ### Nouveautés
 - Nouveau logo de l'application.
@@ -35,13 +35,13 @@
 ### Corrections
 - Téléchargement vers un dossier protégé par Windows : l'erreur est reconnue et le téléchargement est relancé automatiquement.
 
-## 0.2.2 - 30 octobre 2026
+## 1.0.2 - 30 octobre 2026
 
 ### Corrections
 - Dossier de destination protégé par Windows : le téléchargement est relancé ailleurs avec un message explicite.
 - Vue Artistes : case de sélection mal placée corrigée.
 
-## 0.2.1 - 30 octobre 2026
+## 1.0.1 - 30 octobre 2026
 
 ### Corrections
 - Le choix d'un dossier ne bloque plus la fenêtre.
@@ -50,7 +50,7 @@
 ### Améliorations
 - Page « À propos » réorganisée.
 
-## 0.2.0 - 30 octobre 2026
+## 1.0.0 - 30 octobre 2026
 
 ### Nouveautés
 - Installateur Windows.
@@ -71,6 +71,6 @@
 ### Corrections
 - Plusieurs erreurs de téléchargement et d'affichage corrigées.
 
-## 0.1.0
+## 0.1.0 - Première version (avant la reprise du projet)
 
 - Première version.

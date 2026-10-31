@@ -1,5 +1,6 @@
 ﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import packageInfo from "../package.json";
+import { enable as enableAutostart, disable as disableAutostart } from "@tauri-apps/plugin-autostart";
 import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
 import {
   cancelActiveDownload,
@@ -154,6 +155,7 @@ const DEFAULT_SETTINGS = {
   customCloseActionEnabled: true,
   closeActionTarget: "tray",
   saveWindowSize: true,
+  launchOnStartup: false,
   defaultOutputDir: "",
   defaultVideoOutputDir: "",
   defaultFormat: "mp3",
@@ -345,6 +347,25 @@ const PLAYER_PREFS_KEY = "rapidtunes.player";
 const WINDOW_SIZE_KEY = "rapidtunes.windowSize";
 // Doit rester identique à width/height/minWidth/minHeight de tauri.conf.json.
 const MIN_WINDOW_SIZE = { width: 980, height: 600 };
+
+const MINI_WINDOW_SIZE_KEY = "rapidtunes.miniWindowSize";
+
+function clampMiniSize(size) {
+  return {
+    width: Math.min(MINI_PLAYER_MAX.width, Math.max(MINI_PLAYER_MIN.width, Math.round(size.width))),
+    height: Math.min(MINI_PLAYER_MAX.height, Math.max(MINI_PLAYER_MIN.height, Math.round(size.height)))
+  };
+}
+
+function readSavedMiniSize() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MINI_WINDOW_SIZE_KEY) ?? "null");
+    if (parsed && Number.isFinite(parsed.width) && Number.isFinite(parsed.height)) return clampMiniSize(parsed);
+  } catch {
+    // taille non sauvegardée
+  }
+  return null;
+}
 
 function readSavedWindowSize() {
   try {
@@ -984,8 +1005,14 @@ export default function App() {
   const libraryScanBusyRef = useRef(false);
   const isMiniPlayerRef = useRef(false);
   const windowSizeReadyRef = useRef(false);
-  const saveWindowSizeRef = useRef(null);
   const initialWindowSizeRef = useRef(readSavedWindowSize());
+  // Dernières tailles choisies par l'utilisateur (fenêtre normale / mini lecteur), conservées entre les changements d'aperçu.
+  const normalSizeRef = useRef(initialWindowSizeRef.current);
+  const miniSizeRef = useRef(readSavedMiniSize());
+  // Les opérations de fenêtre (plein écran, mini lecteur) sont exécutées l'une après l'autre pour éviter les courses.
+  const windowOpQueueRef = useRef(Promise.resolve());
+  const windowTransitionUntilRef = useRef(0);
+  const saveWindowSizeRef = useRef(null);
   const fullscreenActiveRef = useRef(false);
   const refreshLibraryRef = useRef(null);
   const artQueueRef = useRef(Promise.resolve());
@@ -1001,6 +1028,7 @@ export default function App() {
   const [isShuffleOn, setIsShuffleOn] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off");
   const [isMiniPlayer, setIsMiniPlayer] = useState(false);
+  const [windowMenu, setWindowMenu] = useState(null);
   const [playingLibraryMediaId, setPlayingLibraryMediaId] = useState(null);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -1016,7 +1044,6 @@ export default function App() {
   const [eqGains, setEqGains] = useState(EQ_PRESETS[0].gains);
   const [isEqLinked, setIsEqLinked] = useState(true);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-  const savedWindowSizeRef = useRef(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState("behaviors");
   const [settings, setSettings] = useState(() => {
     if (typeof window === "undefined") {
@@ -1814,8 +1841,9 @@ export default function App() {
       }
     };
     refresh();
-    getCurrentWindow()
-      .onResized(refresh)
+    // Hors contexte Tauri (mode web), getCurrentWindow() lève une erreur synchrone.
+    Promise.resolve()
+      .then(() => getCurrentWindow().onResized(refresh))
       .then((off) => {
         if (cancelled) off();
         else unlisten = off;
@@ -1843,6 +1871,31 @@ export default function App() {
       console.warn("Action fenêtre indisponible hors contexte Tauri:", err);
     }
   };
+
+  const openWindowMenu = (event) => {
+    // Mode debug web (navigateur): on laisse le menu natif pour pouvoir inspecter un élément.
+    if (window.__RAPIDTUNES_WEB_DEBUG__) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setWindowMenu({ x: event.clientX, y: event.clientY });
+  };
+
+  useEffect(() => {
+    if (!windowMenu) return undefined;
+    const close = (event) => {
+      if (event.type === "keydown" && event.key !== "Escape") return;
+      if (event.target instanceof Element && event.target.closest(".mlv-ctx")) return;
+      setWindowMenu(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("blur", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+      window.removeEventListener("blur", close);
+    };
+  }, [windowMenu]);
 
   const stopDragPropagation = (event) => {
     event.stopPropagation();
@@ -2045,6 +2098,12 @@ export default function App() {
     // Vérification unique au démarrage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Synchronise l'option « Lancer au démarrage » avec le système (registre Windows).
+  useEffect(() => {
+    const sync = settings.launchOnStartup ? enableAutostart : disableAutostart;
+    sync().catch((err) => console.warn("Lancement au démarrage indisponible:", err));
+  }, [settings.launchOnStartup]);
 
   const updateSetting = (name, value) => {
     setSettings((prev) => ({
@@ -2967,40 +3026,62 @@ export default function App() {
     </section>
   );
 
-  const toggleMiniPlayer = async () => {
-    const enteringMini = !isMiniPlayer;
-    try {
+  const runWindowOp = (operation) => {
+    const run = async () => {
+      try {
+        await operation();
+      } catch (err) {
+        console.warn("Opération de fenêtre indisponible hors contexte Tauri:", err);
+      } finally {
+        // Les événements de redimensionnement provoqués par la transition ne sont pas des tailles choisies par l'utilisateur.
+        windowTransitionUntilRef.current = Date.now() + 700;
+      }
+    };
+    windowOpQueueRef.current = windowOpQueueRef.current.then(run, run);
+    return windowOpQueueRef.current;
+  };
+
+  const toggleMiniPlayer = () => {
+    const enteringMini = !isMiniPlayerRef.current;
+    // Le mode est basculé tout de suite: les effets de plein écran voient déjà le bon état et la file garde l'ordre.
+    isMiniPlayerRef.current = enteringMini;
+    windowTransitionUntilRef.current = Date.now() + 5000;
+    setVideoDisplayMode("windowed");
+    setIsMiniPlayer(enteringMini);
+    return runWindowOp(async () => {
       const appWindow = getCurrentWindow();
       if (enteringMini) {
-        const scale = await appWindow.scaleFactor();
-        savedWindowSizeRef.current = (await appWindow.innerSize()).toLogical(scale);
-        setVideoDisplayMode("windowed");
+        // Sortie complète du plein écran / de l'agrandissement avant de redimensionner.
+        await appWindow.setFullscreen(false);
+        await appWindow.setResizable(true);
+        if (await appWindow.isMaximized()) await appWindow.unmaximize();
+        // Sans bouton d'agrandissement, Windows n'ancre plus (Aero Snap) ni n'agrandit la fenêtre en la glissant au bord.
+        await appWindow.setMaximizable(false);
+        const target = clampMiniSize(miniSizeRef.current ?? MINI_PLAYER_SIZE);
         await appWindow.setMinSize(new LogicalSize(MINI_PLAYER_MIN.width, MINI_PLAYER_MIN.height));
         await appWindow.setMaxSize(new LogicalSize(MINI_PLAYER_MAX.width, MINI_PLAYER_MAX.height));
-        await appWindow.setSize(new LogicalSize(MINI_PLAYER_SIZE.width, MINI_PLAYER_SIZE.height));
+        await appWindow.setSize(new LogicalSize(target.width, target.height));
         await appWindow.setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false);
       } else {
         await appWindow.setAlwaysOnTop(false);
+        await appWindow.setMaximizable(true);
         await appWindow.setMaxSize(null);
         await appWindow.setMinSize(new LogicalSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height));
-        const previous = savedWindowSizeRef.current;
+        const previous = normalSizeRef.current;
         await appWindow.setSize(
           new LogicalSize(
-            previous?.width ?? MIN_WINDOW_SIZE.width,
-            previous?.height ?? MIN_WINDOW_SIZE.height
+            Math.max(MIN_WINDOW_SIZE.width, previous?.width ?? MIN_WINDOW_SIZE.width),
+            Math.max(MIN_WINDOW_SIZE.height, previous?.height ?? MIN_WINDOW_SIZE.height)
           )
         );
       }
-    } catch (err) {
-      console.warn("Mini lecteur indisponible hors contexte Tauri:", err);
-    }
-    setIsMiniPlayer(enteringMini);
+    });
   };
 
   useEffect(() => {
     if (!isMiniPlayer) return;
-    getCurrentWindow()
-      .setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false)
+    Promise.resolve()
+      .then(() => getCurrentWindow().setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false))
       .catch(() => {});
   }, [isMiniPlayer, settings.playerMiniAlwaysOnTop]);
 
@@ -3124,17 +3205,36 @@ export default function App() {
   }, [selectedLibraryMedia?.id, playingLibraryMedia?.id, settings.playerShowCovers]);
 
   const saveWindowSizeNow = () => {
-    if (!settings.saveWindowSize || !windowSizeReadyRef.current) return;
-    // Ni en plein écran, ni en mini lecteur, ni maximisée: ces tailles ne sont pas celles de la fenêtre normale.
-    if (isMiniPlayerRef.current || fullscreenActiveRef.current || document.fullscreenElement) return;
-    const maximized =
-      window.outerWidth >= window.screen.availWidth - 8 && window.outerHeight >= window.screen.availHeight - 8;
-    if (maximized) return;
+    if (!windowSizeReadyRef.current) return;
+    // Pas de mémorisation pendant une transition (plein écran, mini lecteur) ni en plein écran.
+    if (Date.now() < windowTransitionUntilRef.current) return;
+    if (
+      isMiniPlayerRef.current &&
+      (window.innerWidth > MINI_PLAYER_MAX.width + 8 || window.innerHeight > MINI_PLAYER_MAX.height + 8)
+    ) {
+      // Agrandi malgré tout (ancrage Windows...): on revient à la dernière taille du mini lecteur.
+      runWindowOp(async () => {
+        const appWindow = getCurrentWindow();
+        if (await appWindow.isMaximized()) await appWindow.unmaximize();
+        const target = clampMiniSize(miniSizeRef.current ?? MINI_PLAYER_SIZE);
+        await appWindow.setSize(new LogicalSize(target.width, target.height));
+      });
+      return;
+    }
+    if (fullscreenActiveRef.current || document.fullscreenElement) return;
+    const size = { width: window.innerWidth, height: window.innerHeight };
     try {
-      window.localStorage.setItem(
-        WINDOW_SIZE_KEY,
-        JSON.stringify({ width: window.innerWidth, height: window.innerHeight })
-      );
+      if (isMiniPlayerRef.current) {
+        miniSizeRef.current = clampMiniSize(size);
+        window.localStorage.setItem(MINI_WINDOW_SIZE_KEY, JSON.stringify(miniSizeRef.current));
+        return;
+      }
+      // Une fenêtre agrandie n'est pas la taille choisie par l'utilisateur.
+      const maximized =
+        window.outerWidth >= window.screen.availWidth - 8 && window.outerHeight >= window.screen.availHeight - 8;
+      if (maximized) return;
+      normalSizeRef.current = size;
+      if (settings.saveWindowSize) window.localStorage.setItem(WINDOW_SIZE_KEY, JSON.stringify(size));
     } catch {
       // taille non sauvegardée
     }
@@ -3159,8 +3259,9 @@ export default function App() {
   useEffect(() => {
     fullscreenActiveRef.current = isPlayerFullscreen;
     // Vrai plein écran: la fenêtre occupe tout l'écran et ne peut plus être déplacée.
-    (async () => {
-      try {
+    windowTransitionUntilRef.current = Date.now() + 5000;
+    runWindowOp(async () => {
+      {
         const appWindow = getCurrentWindow();
         if (isPlayerFullscreen) {
           // Sans cadre de redimensionnement ni barre des tâches par-dessus, la bordure Windows disparaît.
@@ -3176,13 +3277,11 @@ export default function App() {
           await appWindow.setResizable(true);
           if (wasMaximizedBeforeFullscreenRef.current) {
             wasMaximizedBeforeFullscreenRef.current = false;
-            await appWindow.maximize();
+            if (!isMiniPlayerRef.current) await appWindow.maximize();
           }
         }
-      } catch (err) {
-        console.warn("Plein écran indisponible hors contexte Tauri:", err);
       }
-    })();
+    });
   }, [isPlayerFullscreen]);
 
   useLayoutEffect(() => {
@@ -3253,7 +3352,7 @@ export default function App() {
   return (
     <main className="app-root" style={resolvedTheme.style}>
       <section className="window-frame">
-        <header className="titlebar" data-tauri-drag-region onMouseDown={handleStartDragging}>
+        <header className="titlebar" data-tauri-drag-region onMouseDown={handleStartDragging} onContextMenu={openWindowMenu}>
           <div className="titlebar-hit-zone" onMouseDown={handleStartDragging} aria-hidden="true" />
           <div className="titlebar-drag" data-tauri-drag-region onMouseDown={handleStartDragging}>
             <h1>RapidTunes</h1>
@@ -3911,8 +4010,48 @@ export default function App() {
 
       <div className="media-engine-hidden" ref={hiddenHostRef} aria-hidden="true" />
 
+      {windowMenu ? (
+        <div
+          className="mlv-ctx"
+          style={{
+            left: Math.max(8, Math.min(windowMenu.x, window.innerWidth - 230)),
+            top: Math.max(8, Math.min(windowMenu.y, window.innerHeight - 140))
+          }}
+          role="menu"
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          {[
+            ...(isMiniPlayer
+              ? [{ label: "Quitter le mini lecteur", icon: "maximize", run: toggleMiniPlayer }]
+              : [{ label: "Agrandir / Restaurer", icon: "maximize", run: () => handleWindowAction("maximize") }]),
+            { label: "Réduire", icon: "minimize", run: () => handleWindowAction("minimize") },
+            { divider: true },
+            { label: "Fermer", icon: "close", run: () => handleWindowAction("close") }
+          ].map((entry, index) =>
+            entry.divider ? (
+              <div key={`divider-${index}`} className="mlv-ctx__divider" />
+            ) : (
+              <div key={entry.label} className="mlv-ctx__row">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="mlv-ctx__item"
+                  onClick={() => {
+                    setWindowMenu(null);
+                    entry.run();
+                  }}
+                >
+                  <PlayerIcon name={entry.icon} />
+                  <span>{entry.label}</span>
+                </button>
+              </div>
+            )
+          )}
+        </div>
+      ) : null}
+
       {isMiniPlayer ? (
-        <section className="media-mini-player" onMouseDown={handleStartDragging} aria-label="Mini lecteur">
+        <section className="media-mini-player" onMouseDown={handleStartDragging} onContextMenu={openWindowMenu} aria-label="Mini lecteur">
           <div className="media-mini-player__head">
             <strong>{playingLibraryMedia?.title ?? "Lecteur média"}</strong>
             <button
@@ -3959,6 +4098,30 @@ export default function App() {
           <div className="media-mini-player__foot">
             <div className="media-player-bar__track">
               <span style={{ width: `${audioPlayerProgress}%` }} />
+            </div>
+            <div className="media-player-volume media-mini-player__volume">
+              <button
+                type="button"
+                className="media-player-btn"
+                onClick={() => setIsMuted((prev) => !prev)}
+                aria-label={isMuted ? "Réactiver le son" : "Couper le son"}
+                title={isMuted ? "Réactiver le son" : "Couper le son"}
+              >
+                <PlayerIcon name={isMuted || volume === 0 ? "volume-0" : volume < 0.34 ? "volume-1" : volume < 0.67 ? "volume-2" : "volume-3"} />
+              </button>
+              <input
+                type="range"
+                className="media-player-volume__slider"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onChange={(event) => {
+                  setVolume(Number(event.target.value));
+                  setIsMuted(false);
+                }}
+                aria-label="Volume"
+              />
             </div>
             {renderMoreMenu()}
             <button
@@ -4325,6 +4488,25 @@ export default function App() {
                           type="checkbox"
                           checked={settings.saveWindowSize}
                           onChange={(event) => updateSetting("saveWindowSize", event.target.checked)}
+                        />
+                        <span className="settings-switch-track">
+                          <span className="settings-switch-thumb" />
+                        </span>
+                      </span>
+                    </div>
+                  </section>
+
+                  <section className="settings-block">
+                    <div className="settings-toggle-row settings-toggle-row--head">
+                      <div className="settings-toggle-text">
+                        <strong>Lancer au démarrage</strong>
+                        <small>Démarre RapidTunes automatiquement à l'ouverture de ta session Windows.</small>
+                      </div>
+                      <span className="settings-switch">
+                        <input
+                          type="checkbox"
+                          checked={settings.launchOnStartup}
+                          onChange={(event) => updateSetting("launchOnStartup", event.target.checked)}
                         />
                         <span className="settings-switch-track">
                           <span className="settings-switch-thumb" />

@@ -16,6 +16,10 @@ pub struct DownloadControlState {
 pub fn run() {
   install_panic_log();
   tauri::Builder::default()
+    .plugin(tauri_plugin_autostart::init(
+      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+      None
+    ))
     .manage(DownloadControlState::default())
     .invoke_handler(tauri::generate_handler![
       commands::download_and_convert,
