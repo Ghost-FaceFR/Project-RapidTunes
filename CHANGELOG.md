@@ -1,69 +1,31 @@
 # Journal des modifications
 
-## 0.2.10 - 31 octobre 2026
+## 0.2.4 - 31 octobre 2026
 
 ### Nouveautés
+- Nouvel installateur aux couleurs de RapidTunes : options d'installation, progression étape par étape, désinstallation avec suppression des données au choix.
+- Mises à jour : un seul bouton « Télécharger et installer », l'application redémarre toute seule.
+- Nouvelles visualisations audio, dont des effets hypnotiques, et visualisations existantes plus belles.
+- Mini lecteur : visualisation, menu « Plus d'options », option « Toujours au premier plan » et taille limitée.
 - Les vidéos s'ouvrent en plein écran au démarrage (désactivable dans les paramètres).
+- Égaliseur : de nombreux préréglages en plus.
+- Volume du lecteur affiché en pourcentage.
 
 ### Améliorations
-- Visualisations audio plus belles et plus fluides.
 - Thèmes de couleurs appliqués partout, y compris les barres de défilement.
 - Media DL réorganisé.
-- Mini lecteur : menu « Plus d'options » corrigé.
-- Plein écran : pochette dans la barre du bas.
-
-### Corrections
-- Bibliothèque : la liste ne déborde plus au-dessus des barres fixes.
-
-## 0.2.9 - 31 octobre 2026
-
-### Nouveautés
-- Nouvelles visualisations audio, dont des effets hypnotiques.
-- Mini lecteur : visualisation et menu « Plus d'options ».
-- Mini lecteur : option « Toujours au premier plan » et taille limitée.
-
-### Améliorations
-- Thèmes de couleurs appliqués à toute l'interface.
-- Menu « Plus d'options » avec sous-menus.
-- Paramètres réorganisés et renommés (Media DL), cartes Thèmes et Mises à jour toujours visibles.
-- Bibliothèque : barre d'actions et en-têtes de colonnes fixes pendant le défilement.
-- Journal des modifications simplifié.
-
-### Corrections
-- Le format et la qualité par défaut sont maintenant appliqués dans Media DL.
-- Zone de clic des interrupteurs limitée au bouton.
-
-## 0.2.8 - 30 octobre 2026
-
-### Améliorations
-- Lecteur plus léger : nette baisse de la consommation CPU pendant la lecture.
-- Page « À propos » simplifiée.
-
-## 0.2.7 - 30 octobre 2026
-
-### Améliorations
+- Paramètres réorganisés et renommés, menus avec sous-menus.
 - Page « À propos » et journal des modifications redessinés.
-- Menus et notifications de l'application à la place des éléments natifs de Windows.
-- Paramètres : cartes repliables et petits ajustements d'interface.
-
-## 0.2.6 - 30 octobre 2026
-
-### Améliorations
-- Nouveau logo.
-
-## 0.2.5 - 30 octobre 2026
-
-### Améliorations
-- Barre de titre épurée.
-
-## 0.2.4 - 30 octobre 2026
-
-### Améliorations
+- Bibliothèque : barres fixes pendant le défilement, mise à jour automatique après un téléchargement.
+- Lecteur plus léger et barre de titre épurée.
 - Icône de l'application plus nette.
 
 ### Corrections
-- Media DL : la carte du haut se vide correctement une fois la file terminée.
-- Media DL : boutons pause, reprise et annuler réorganisés.
+- Media DL : la carte du haut se vide correctement une fois la file terminée, boutons pause, reprise et annuler réorganisés.
+- Le format et la qualité par défaut sont appliqués dans Media DL.
+- « Ouvrir l'emplacement » fonctionne dans l'historique.
+- Zone de clic des interrupteurs limitée au bouton.
+- Menus du mini lecteur et de l'égaliseur ne sont plus coupés.
 
 ## 0.2.3 - 30 octobre 2026
 

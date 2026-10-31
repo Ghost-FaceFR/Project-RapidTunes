@@ -6,3 +6,6 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 release/
+installer/src-tauri/target/
+installer/src-tauri/gen/
+installer/src-tauri/payload/*.exe

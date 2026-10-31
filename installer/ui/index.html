@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Installation de RapidTunes</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="frame">
+      <header class="titlebar" data-tauri-drag-region>
+        <img class="titlebar__logo" src="brand.png" alt="" data-tauri-drag-region />
+        <span class="titlebar__title" id="window-title" data-tauri-drag-region>Installation de RapidTunes</span>
+        <div class="titlebar__buttons">
+          <button type="button" class="titlebar__btn" id="btn-minimize" aria-label="Réduire">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" /></svg>
+          </button>
+          <button type="button" class="titlebar__btn titlebar__btn--close" id="btn-close" aria-label="Fermer">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <img class="sidebar__logo" src="brand.png" alt="RapidTunes" />
+          <ol class="timeline" id="timeline"></ol>
+          <p class="sidebar__version" id="sidebar-version"></p>
+        </aside>
+
+        <main class="content">
+          <!-- Bienvenue -->
+          <section class="page" data-page="welcome">
+            <h1 id="welcome-title">Bienvenue dans RapidTunes</h1>
+            <p class="lead" id="welcome-text">
+              Ce programme va installer RapidTunes, votre lecteur et téléchargeur de médias, sur votre ordinateur.
+            </p>
+            <div class="notice" id="welcome-existing" hidden></div>
+            <ul class="features">
+              <li>Téléchargez et convertissez vos musiques et vidéos</li>
+              <li>Écoutez votre médiathèque avec des visualisations</li>
+              <li>Installation pour votre compte uniquement, sans droits administrateur</li>
+            </ul>
+            <footer class="actions">
+              <button type="button" class="btn" data-action="cancel">Annuler</button>
+              <button type="button" class="btn btn--primary" data-action="to-options">Suivant</button>
+            </footer>
+          </section>
+
+          <!-- Options d'installation -->
+          <section class="page" data-page="options">
+            <h1>Options d'installation</h1>
+            <p class="lead">Choisissez où installer RapidTunes et comment il s'intègre à Windows.</p>
+
+            <label class="field">
+              <span>Dossier d'installation</span>
+              <div class="field__row">
+                <input type="text" id="install-dir" spellcheck="false" />
+                <button type="button" class="btn" id="btn-browse">Parcourir</button>
+              </div>
+            </label>
+
+            <div class="options">
+              <div class="switch-row">
+                <span class="switch-row__text">
+                  <strong>Raccourci sur le bureau</strong>
+                  <small>Ajoute une icône RapidTunes sur votre bureau.</small>
+                </span>
+                <span class="check"><input type="checkbox" id="opt-desktop" checked /><span class="check__box"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.4 2.4 4.6-5" /></svg></span></span>
+              </div>
+              <div class="switch-row">
+                <span class="switch-row__text">
+                  <strong>Raccourci dans le menu Démarrer</strong>
+                  <small>Permet de retrouver RapidTunes depuis la recherche Windows.</small>
+                </span>
+                <span class="check"><input type="checkbox" id="opt-startmenu" checked /><span class="check__box"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.4 2.4 4.6-5" /></svg></span></span>
+              </div>
+              <div class="switch-row">
+                <span class="switch-row__text">
+                  <strong>Lancer au démarrage de Windows</strong>
+                  <small>Ouvre RapidTunes automatiquement à l'ouverture de session.</small>
+                </span>
+                <span class="check"><input type="checkbox" id="opt-autostart" /><span class="check__box"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.4 2.4 4.6-5" /></svg></span></span>
+              </div>
+            </div>
+
+            <p class="error-text" id="options-error" hidden></p>
+            <footer class="actions">
+              <button type="button" class="btn" data-action="to-welcome">Retour</button>
+              <button type="button" class="btn btn--primary" data-action="start-install">Installer</button>
+            </footer>
+          </section>
+
+          <!-- Désinstallation: confirmation -->
+          <section class="page" data-page="uninstall">
+            <h1>Désinstaller RapidTunes</h1>
+            <p class="lead">RapidTunes va être supprimé de cet ordinateur. Vos fichiers musicaux et vidéos ne sont jamais touchés.</p>
+            <div class="options">
+              <div class="switch-row">
+                <span class="switch-row__text">
+                  <strong>Supprimer aussi mes données</strong>
+                  <small>Paramètres, historique, médias récents, playlists et outils téléchargés (yt-dlp, ffmpeg).</small>
+                </span>
+                <span class="check"><input type="checkbox" id="opt-delete-data" /><span class="check__box"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.4 2.4 4.6-5" /></svg></span></span>
+              </div>
+            </div>
+            <footer class="actions">
+              <button type="button" class="btn" data-action="cancel">Annuler</button>
+              <button type="button" class="btn btn--danger" data-action="start-uninstall">Désinstaller</button>
+            </footer>
+          </section>
+
+          <!-- Progression -->
+          <section class="page" data-page="progress">
+            <h1 id="progress-title">Installation en cours</h1>
+            <p class="lead" id="progress-detail">Préparation...</p>
+            <ul class="steps" id="steps"></ul>
+            <div class="progress">
+              <div class="progress__track"><span id="progress-bar"></span></div>
+              <strong id="progress-percent">0 %</strong>
+            </div>
+          </section>
+
+          <!-- Terminé -->
+          <section class="page" data-page="done">
+            <div class="done-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </div>
+            <h1 id="done-title">Installation terminée</h1>
+            <p class="lead" id="done-text">RapidTunes est prêt à être utilisé.</p>
+            <div class="options" id="done-options">
+              <div class="switch-row">
+                <span class="switch-row__text"><strong>Lancer RapidTunes</strong></span>
+                <span class="check"><input type="checkbox" id="opt-launch" checked /><span class="check__box"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.4 2.4 4.6-5" /></svg></span></span>
+              </div>
+            </div>
+            <footer class="actions">
+              <button type="button" class="btn btn--primary" data-action="finish">Terminer</button>
+            </footer>
+          </section>
+
+          <!-- Erreur -->
+          <section class="page" data-page="error">
+            <div class="done-icon done-icon--error" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" /></svg>
+            </div>
+            <h1>Un problème est survenu</h1>
+            <p class="lead error-text" id="error-message"></p>
+            <footer class="actions">
+              <button type="button" class="btn" data-action="cancel">Fermer</button>
+              <button type="button" class="btn btn--primary" data-action="retry">Réessayer</button>
+            </footer>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

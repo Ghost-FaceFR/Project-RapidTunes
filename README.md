@@ -127,8 +127,8 @@ rapidtunes.bat        Lanceur Windows
 
 1. Augmenter la version dans `package.json`, `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`.
 2. Compléter `CHANGELOG.md`.
-3. Compiler : `rapidtunes.bat build` (produit `release\RapidTunes_<version>_x64-setup.exe`).
-4. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`), dont le texte reprend la section du `CHANGELOG.md` (il alimente le journal des modifications de l'application), et y joindre l'installateur `-setup.exe`.
+3. Compiler : `powershell -File scriptsuild-release.ps1` (produit dans `release\` l'installateur RapidTunes `RapidTunes_<version>_x64-setup.exe`, dont l'interface est dans `installer\`, et l'installateur NSIS classique `RapidTunes_<version>_x64-classic.exe`).
+4. Créer une *Release* GitHub dont le tag est la version (ex. `v0.2.0`), dont le texte reprend la section du `CHANGELOG.md` (il alimente le journal des modifications de l'application), et y joindre les deux installateurs (`-setup.exe`, utilisé par la mise à jour automatique, et `-classic.exe`).
 
 L'application compare le tag de la dernière release à sa version et propose la mise à jour si elle est plus récente.
 

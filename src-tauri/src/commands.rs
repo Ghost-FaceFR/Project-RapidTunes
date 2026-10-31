@@ -164,26 +164,29 @@ pub async fn open_file_location(path: String) -> Result<(), String> {
     return Err("Chemin vide.".to_string());
   }
 
-  if !target.exists() {
-    return Err("Le fichier n'existe pas.".to_string());
-  }
+  // Le fichier a pu être déplacé ou supprimé: on ouvre alors son dossier s'il existe encore.
+  let (target_path, select_file) = if target.exists() {
+    (normalized_path.clone(), true)
+  } else if let Some(parent) = target.parent().filter(|parent| parent.exists()) {
+    (parent.to_string_lossy().to_string(), false)
+  } else {
+    return Err("Le fichier et son dossier n'existent plus.".to_string());
+  };
 
   #[cfg(target_os = "windows")]
   {
-    let output = Command::new("explorer")
-      .args(["/select,", &normalized_path])
-      .output()
-      .await
-      .map_err(|err| format!("Impossible d'ouvrir l'emplacement: {err}"))?;
-
-    if output.status.success() {
-      return Ok(());
+    // Explorer exige des antislashs et renvoie un code de sortie 1 même quand tout s'est bien passé.
+    let windows_path = target_path.replace('/', "\\");
+    let mut command = Command::new("explorer");
+    if select_file {
+      command.arg(format!("/select,{windows_path}"));
+    } else {
+      command.arg(&windows_path);
     }
-
-    return Err(format!(
-      "Impossible d'ouvrir l'emplacement: {}",
-      String::from_utf8_lossy(&output.stderr).trim()
-    ));
+    command
+      .spawn()
+      .map_err(|err| format!("Impossible d'ouvrir l'emplacement: {err}"))?;
+    return Ok(());
   }
 
   #[cfg(target_os = "macos")]
@@ -508,9 +511,13 @@ pub async fn launch_update(app: AppHandle, path: String) -> Result<(), String> {
 
   #[cfg(target_os = "windows")]
   {
-    media_service::no_window_std(std::process::Command::new("cmd"))
-      .args(["/C", "start", ""])
-      .arg(&target)
+    use std::os::windows::process::CommandExt;
+    // Installation allégée (/P) puis relance de l'application (/R); processus détaché pour survivre à la fermeture.
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    std::process::Command::new(&target)
+      .args(["/P", "/R"])
+      .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
       .spawn()
       .map_err(|err| format!("Impossible de lancer la mise à jour: {err}"))?;
   }

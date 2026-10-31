@@ -219,7 +219,24 @@ const EQ_PRESETS = [
   { id: "bass", label: "Basses renforcées", gains: [6, 5, 4, 2, 0, 0, 0, 0, 0] },
   { id: "treble", label: "Aigus renforcés", gains: [0, 0, 0, 0, 0, 2, 4, 5, 6] },
   { id: "vocal", label: "Voix", gains: [-2, -1, 0, 2, 4, 4, 2, 0, -1] },
-  { id: "rock", label: "Rock", gains: [5, 4, 2, -1, -2, 1, 3, 4, 5] }
+  { id: "rock", label: "Rock", gains: [5, 4, 2, -1, -2, 1, 3, 4, 5] },
+  { id: "pop", label: "Pop", gains: [-1, 1, 3, 4, 3, 0, -1, -1, -1] },
+  { id: "hiphop", label: "Hip-hop", gains: [6, 5, 3, 3, -1, -1, 1, 0, 2] },
+  { id: "electro", label: "Électro", gains: [5, 4, 1, 0, -2, 2, 1, 4, 5] },
+  { id: "dance", label: "Dance", gains: [6, 5, 2, 0, 0, -2, -3, -2, 0] },
+  { id: "club", label: "Club", gains: [0, 0, 3, 4, 4, 4, 2, 0, 0] },
+  { id: "party", label: "Soirée", gains: [5, 4, 0, 0, 0, 0, 0, 4, 5] },
+  { id: "jazz", label: "Jazz", gains: [3, 2, 1, 2, -2, -2, 0, 1, 3] },
+  { id: "classical", label: "Classique", gains: [4, 3, 2, 1, -1, -1, 0, 2, 3] },
+  { id: "acoustic", label: "Acoustique", gains: [4, 4, 3, 1, 2, 2, 3, 3, 2] },
+  { id: "metal", label: "Métal", gains: [5, 4, 0, -2, -3, 2, 4, 5, 4] },
+  { id: "soft", label: "Doux", gains: [3, 2, 1, 0, -1, -2, -3, -4, -5] },
+  { id: "loudness", label: "Loudness", gains: [6, 4, 0, -1, -1, 0, -1, 4, 6] },
+  { id: "headphones", label: "Casque", gains: [4, 3, 1, -2, -1, 1, 3, 4, 5] },
+  { id: "cinema", label: "Cinéma", gains: [4, 3, 1, 0, 2, 3, 1, 2, 3] },
+  { id: "speech", label: "Podcast / Parole", gains: [-4, -2, 0, 2, 4, 4, 3, 1, -2] },
+  { id: "lessbass", label: "Moins de basses", gains: [-6, -5, -3, -1, 0, 0, 0, 0, 0] },
+  { id: "lesstreble", label: "Moins d'aigus", gains: [0, 0, 0, 0, 0, -1, -3, -5, -6] }
 ];
 
 function formatClock(totalSeconds) {
@@ -1879,7 +1896,9 @@ export default function App() {
     setUpdateState((prev) => ({ ...prev, status: "downloading", message: "" }));
     try {
       const path = await downloadUpdate(asset.url, asset.name);
-      setUpdateState((prev) => ({ ...prev, status: "ready", message: "", path }));
+      setUpdateState((prev) => ({ ...prev, status: "installing", message: "", path }));
+      // Installe directement: l'application se ferme, la mise à jour s'installe puis RapidTunes redémarre.
+      await launchUpdate(path);
     } catch (error) {
       setUpdateState((prev) => ({ ...prev, status: "error", message: String(error) }));
     }
@@ -1902,6 +1921,7 @@ export default function App() {
         {updateState.status === "available" &&
           `Nouvelle version disponible : ${updateState.info.version} (actuelle : ${APP_VERSION})`}
         {updateState.status === "downloading" && "Téléchargement de la mise à jour..."}
+        {updateState.status === "installing" && "Installation en cours : RapidTunes va redémarrer..."}
         {updateState.status === "ready" && "Mise à jour téléchargée. Prête à être installée."}
         {updateState.status === "error" && updateState.message}
         {updateState.status === "idle" && "Vérifie si une nouvelle version est disponible."}
@@ -1909,7 +1929,7 @@ export default function App() {
       <div className="about-update__actions">
         {updateState.status === "available" ? (
           <button type="button" className="about-update__btn about-update__btn--primary" onClick={handleDownloadUpdate}>
-            Télécharger la mise à jour
+            Télécharger et installer
           </button>
         ) : null}
         {updateState.status === "ready" ? (
@@ -1917,7 +1937,7 @@ export default function App() {
             Installer et redémarrer
           </button>
         ) : null}
-        {updateState.status !== "downloading" && updateState.status !== "ready" ? (
+        {updateState.status !== "downloading" && updateState.status !== "installing" && updateState.status !== "ready" ? (
           <button
             type="button"
             className="about-update__btn"
@@ -2419,7 +2439,11 @@ export default function App() {
       });
 
     if (!covered) {
+      // Le nouveau dossier est ajouté à la bibliothèque, ce qui relance l'analyse.
       setLibraryFolders({ ...current, needsVideoDefault: false, [kind]: [...list, directory] });
+    } else {
+      // Dossier déjà suivi: on réanalyse pour que le téléchargement apparaisse tout de suite.
+      refreshLibraryRef.current?.({ silent: true });
     }
   }
 
@@ -2917,6 +2941,7 @@ export default function App() {
               }}
               aria-label="Volume"
             />
+            <span className="media-player-volume__value">{Math.round((isMuted ? 0 : volume) * 100)} %</span>
           </div>
           <button
             type="button"

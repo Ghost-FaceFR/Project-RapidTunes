@@ -6189,3 +6189,42 @@ body {
   max-height: none;
   overflow-y: auto;
 }
+
+/* Egaliseur: selecteur de preset et menu lisibles, sans etre coupes par la fenetre */
+.player-modal--eq,
+.player-modal--eq .player-modal__body {
+  overflow: visible;
+}
+
+.player-modal__preset .custom-select-box {
+  width: 230px;
+}
+
+.player-modal .custom-select-menu {
+  left: 0;
+  right: auto;
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+  z-index: 450;
+}
+
+.player-modal .custom-select-option {
+  height: 32px;
+  white-space: nowrap;
+}
+
+/* Pourcentage de volume */
+.media-player-volume__value {
+  min-width: 38px;
+  color: var(--theme-text-2);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Liste de presets de l'égaliseur: défilement quand elle est longue */
+.player-modal .custom-select-menu {
+  max-height: 280px;
+  overflow-y: auto;
+}

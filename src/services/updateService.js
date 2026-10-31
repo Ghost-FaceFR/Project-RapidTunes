@@ -22,6 +22,7 @@ export function isNewerVersion(candidate, current) {
 function pickInstallerAsset(assets) {
   const candidates = (assets ?? []).filter((asset) => /\.(exe|msi)$/i.test(asset.name));
   return (
+    candidates.find((asset) => /setup|install/i.test(asset.name) && !/classic/i.test(asset.name)) ??
     candidates.find((asset) => /setup|install/i.test(asset.name)) ??
     candidates.find((asset) => /\.msi$/i.test(asset.name)) ??
     candidates[0] ??
