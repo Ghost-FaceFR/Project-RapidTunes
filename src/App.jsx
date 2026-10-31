@@ -71,9 +71,9 @@ const QUALITY_OPTIONS_BY_FORMAT = {
 const SETTINGS_MENU = [
   { id: "behaviors", label: "Comportements" },
   { id: "appearance", label: "Apparence" },
-  { id: "player", label: "Lecteur média" },
   { id: "language", label: "Langue & heure" },
-  { id: "download", label: "Téléchargements" },
+  { id: "player", label: "Lecteur média" },
+  { id: "download", label: "Media DL" },
   { id: "updates", label: "Mises à jour" }
 ];
 const SETTINGS_TAB_DESCRIPTIONS = {
@@ -81,7 +81,7 @@ const SETTINGS_TAB_DESCRIPTIONS = {
   appearance: "Paramètres d'apparence de l'interface.",
   player: "Bibliothèque, lecture et informations du Lecteur média.",
   language: "Règle la langue et le format d'affichage des dates.",
-  download: "Configuration des téléchargements, dossier cible et valeurs par défaut.",
+  download: "Dossiers de téléchargement, format et qualité par défaut.",
   updates: "Gère les vérifications et le comportement des mises à jour."
 };
 
@@ -745,8 +745,16 @@ function QueuePlaceholderThumb({ isPlaylist = false, className = "queue-media-th
 }
 
 /** Carte de paramètres repliable (repliée par défaut). */
-function CollapsibleBlock({ head, defaultOpen = false, children }) {
+function CollapsibleBlock({ head, defaultOpen = false, collapsible = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
+  if (!collapsible) {
+    return (
+      <section className="settings-block">
+        <div className="settings-card-head settings-static__head">{head}</div>
+        {children}
+      </section>
+    );
+  }
   return (
     <section className={`settings-block settings-collapsible ${open ? "" : "settings-collapsible--closed"}`}>
       <button
@@ -977,6 +985,7 @@ export default function App() {
   const [isVisualizerMenuOpen, setIsVisualizerMenuOpen] = useState(false);
   const wasMaximizedBeforeFullscreenRef = useRef(false);
   const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
+  const [isVizColorOpen, setIsVizColorOpen] = useState(false);
   const [videoSettings, setVideoSettings] = useState(DEFAULT_VIDEO_SETTINGS);
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isEqEnabled, setIsEqEnabled] = useState(false);
@@ -1237,6 +1246,22 @@ export default function App() {
     if (normalizedQuality !== settings.defaultQuality) {
       updateSetting("defaultQuality", normalizedQuality);
     }
+  }, [settings.defaultFormat, settings.defaultQuality]);
+
+  // Le formulaire Media DL reprend le format et la qualité par défaut au démarrage et à chaque changement.
+  useEffect(() => {
+    if (!FORMAT_OPTIONS.includes(settings.defaultFormat)) return;
+    const quality = normalizeQualityForFormat(settings.defaultFormat, settings.defaultQuality);
+    setForm((prev) =>
+      prev.format === settings.defaultFormat && prev.quality === quality
+        ? prev
+        : {
+            ...prev,
+            format: settings.defaultFormat,
+            mode: settings.defaultFormat === "mp4" ? "video" : "extract_audio",
+            quality
+          }
+    );
   }, [settings.defaultFormat, settings.defaultQuality]);
 
   useEffect(() => {
@@ -2253,7 +2278,7 @@ export default function App() {
 
   const renderSettingToggle = (name, title, description) => (
     <section className="settings-block" key={name}>
-      <label className="settings-toggle-row settings-toggle-row--head">
+      <div className="settings-toggle-row settings-toggle-row--head">
         <div className="settings-toggle-text">
           <strong>{title}</strong>
           <small>{description}</small>
@@ -2268,7 +2293,7 @@ export default function App() {
             <span className="settings-switch-thumb" />
           </span>
         </span>
-      </label>
+      </div>
     </section>
   );
 
@@ -2451,6 +2476,274 @@ export default function App() {
     }
   };
 
+  const renderMoreMenu = () => {
+    const closeSubmenus = () => {
+      setIsSpeedMenuOpen(false);
+      setIsVisualizerMenuOpen(false);
+      setIsVizColorOpen(false);
+      setIsVideoSettingsOpen(false);
+    };
+    const openPage = (open) => {
+      closeSubmenus();
+      open(true);
+    };
+    const isVideoMedia = playingLibraryMedia?.type === "video";
+    const page = isSpeedMenuOpen
+      ? "speed"
+      : isVisualizerMenuOpen
+        ? "viz"
+        : isVizColorOpen
+          ? "color"
+          : isVideoSettingsOpen && isVideoMedia
+            ? "video"
+            : null;
+    const pageTitles = {
+      speed: "Vitesse de lecture",
+      viz: "Visualisation",
+      color: "Couleurs de la visualisation",
+      video: "Paramètres vidéo"
+    };
+    const goBack = () => {
+      if (page === "color") openPage(setIsVisualizerMenuOpen);
+      else closeSubmenus();
+    };
+    const visualizerLabel = VISUALIZER_MODES.find((entry) => entry.id === visualizerMode)?.label;
+    const colorLabel = VISUALIZER_COLORS.find((entry) => entry.id === settings.playerVisualizerColor)?.label;
+    const checkMark = (active) => (
+      <span className="media-player-menu__check">{active ? <PlayerIcon name="check" /> : null}</span>
+    );
+
+    return (
+      <div className="media-player-menu-anchor">
+        <button
+          type="button"
+          className={`media-player-btn ${isMoreMenuOpen ? "active" : ""}`}
+          onClick={() => {
+            closeSubmenus();
+            setIsMoreMenuOpen((prev) => !prev);
+          }}
+          aria-haspopup="menu"
+          aria-expanded={isMoreMenuOpen}
+          aria-label="Plus d'options"
+          title="Plus d'options"
+        >
+          <PlayerIcon name="more" />
+        </button>
+        {isMoreMenuOpen ? (
+          <div className="media-player-menu" role="menu">
+            {page ? (
+              <>
+                <button type="button" className="media-player-menu__back" onClick={goBack}>
+                  <span className="media-player-menu__chevron media-player-menu__chevron--back">
+                    <PlayerIcon name="chevron" />
+                  </span>
+                  <span>{pageTitles[page]}</span>
+                </button>
+                <div className="media-player-menu__divider" />
+                {page === "speed"
+                  ? PLAYBACK_SPEEDS.map((speed) => (
+                      <button
+                        key={speed}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={playbackSpeed === speed}
+                        className="media-player-menu__item media-player-menu__item--sub"
+                        onClick={() => setPlaybackSpeed(speed)}
+                      >
+                        {checkMark(playbackSpeed === speed)}
+                        <span>{speed === 1 ? "Normale (1x)" : `${speed}x`}</span>
+                      </button>
+                    ))
+                  : null}
+                {page === "viz" ? (
+                  <>
+                    {VISUALIZER_MODES.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={visualizerMode === entry.id}
+                        className="media-player-menu__item media-player-menu__item--sub"
+                        onClick={() => updateSetting("playerVisualizer", entry.id)}
+                      >
+                        {checkMark(visualizerMode === entry.id)}
+                        <span>{entry.label}</span>
+                      </button>
+                    ))}
+                    {visualizerMode !== "off" ? (
+                      <>
+                        <div className="media-player-menu__divider" />
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="media-player-menu__item"
+                          onClick={() => openPage(setIsVizColorOpen)}
+                        >
+                          <PlayerIcon name="equalizer" />
+                          <span>Couleurs ({colorLabel})</span>
+                          <span className="media-player-menu__chevron">
+                            <PlayerIcon name="chevron" />
+                          </span>
+                        </button>
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
+                {page === "color" ? (
+                  <>
+                    {VISUALIZER_COLORS.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={settings.playerVisualizerColor === entry.id}
+                        className="media-player-menu__item media-player-menu__item--sub"
+                        onClick={() => updateSetting("playerVisualizerColor", entry.id)}
+                      >
+                        {checkMark(settings.playerVisualizerColor === entry.id)}
+                        <span>{entry.label}</span>
+                        <span
+                          className="media-player-menu__swatch"
+                          style={{
+                            background: entry.colors
+                              ? `linear-gradient(90deg, ${entry.colors.join(", ")})`
+                              : entry.id === "custom"
+                                ? settings.playerVisualizerCustomColor
+                                : "linear-gradient(90deg, var(--neon-2), var(--neon-1), var(--neon-3))"
+                          }}
+                        />
+                      </button>
+                    ))}
+                    {settings.playerVisualizerColor === "custom" ? (
+                      <label className="media-player-menu__slider">
+                        <span>Couleur personnalisée</span>
+                        <input
+                          type="color"
+                          value={settings.playerVisualizerCustomColor}
+                          onChange={(event) => updateSetting("playerVisualizerCustomColor", event.target.value)}
+                        />
+                      </label>
+                    ) : null}
+                  </>
+                ) : null}
+                {page === "video" ? (
+                  <>
+                    {VIDEO_ADJUSTMENTS.map((adjustment) => (
+                      <label key={adjustment.id} className="media-player-menu__slider">
+                        <span>
+                          {adjustment.label} ({videoSettings[adjustment.id]}%)
+                        </span>
+                        <input
+                          type="range"
+                          min="50"
+                          max="150"
+                          step="5"
+                          value={videoSettings[adjustment.id]}
+                          onChange={(event) =>
+                            setVideoSettings((prev) => ({ ...prev, [adjustment.id]: Number(event.target.value) }))
+                          }
+                        />
+                      </label>
+                    ))}
+                    <div className="media-player-menu__divider" />
+                    {VIDEO_FIT_MODES.map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={videoSettings.fit === mode.id}
+                        className="media-player-menu__item media-player-menu__item--sub"
+                        onClick={() => setVideoSettings((prev) => ({ ...prev, fit: mode.id }))}
+                      >
+                        {checkMark(videoSettings.fit === mode.id)}
+                        <span>{mode.label}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="media-player-menu__item media-player-menu__item--sub"
+                      onClick={() => setVideoSettings(DEFAULT_VIDEO_SETTINGS)}
+                    >
+                      <span />
+                      <span>Réinitialiser</span>
+                    </button>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <button type="button" role="menuitem" className="media-player-menu__item" onClick={openProperties}>
+                  <PlayerIcon name="info" />
+                  <span>Propriétés</span>
+                  <kbd>Ctrl+I</kbd>
+                </button>
+                <button type="button" role="menuitem" className="media-player-menu__item" onClick={openEqualizer}>
+                  <PlayerIcon name="equalizer" />
+                  <span>Égaliseur</span>
+                  <kbd>Ctrl+Maj+E</kbd>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="media-player-menu__item"
+                  onClick={() => openPage(setIsSpeedMenuOpen)}
+                >
+                  <PlayerIcon name="speed" />
+                  <span>Vitesse ({playbackSpeed}x)</span>
+                  <span className="media-player-menu__chevron">
+                    <PlayerIcon name="chevron" />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="media-player-menu__item"
+                  onClick={() => openPage(setIsVisualizerMenuOpen)}
+                >
+                  <PlayerIcon name="equalizer" />
+                  <span>Visualisation ({visualizerLabel})</span>
+                  <span className="media-player-menu__chevron">
+                    <PlayerIcon name="chevron" />
+                  </span>
+                </button>
+                <button type="button" role="menuitem" className="media-player-menu__item" disabled title="Non disponible">
+                  <PlayerIcon name="cast" />
+                  <span>Diffuser sur un appareil</span>
+                  <kbd>Ctrl+K</kbd>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="media-player-menu__item"
+                  disabled={!isVideoMedia}
+                  title={!isVideoMedia ? "Disponible pour les vidéos" : undefined}
+                  onClick={() => openPage(setIsVideoSettingsOpen)}
+                >
+                  <PlayerIcon name="video" />
+                  <span>Paramètres vidéo</span>
+                  <span className="media-player-menu__chevron">
+                    <PlayerIcon name="chevron" />
+                  </span>
+                </button>
+                <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(-10)}>
+                  <PlayerIcon name="back10" />
+                  <span>Retour rapide de 10 secondes</span>
+                  <kbd>Ctrl+Gauche</kbd>
+                </button>
+                <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(30)}>
+                  <PlayerIcon name="forward30" />
+                  <span>Avance rapide de 30 secondes</span>
+                  <kbd>Ctrl+Droite</kbd>
+                </button>
+              </>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   const renderPlayerBar = (isFullscreen) => (
     <section
       className={`media-player-bar ${isFullscreen ? "media-player-bar--fullscreen" : ""}`}
@@ -2605,211 +2898,7 @@ export default function App() {
           >
             <PlayerIcon name={isFullscreen ? "minimize" : "maximize"} />
           </button>
-          <div className="media-player-menu-anchor">
-            <button
-              type="button"
-              className={`media-player-btn ${isMoreMenuOpen ? "active" : ""}`}
-              onClick={() => {
-                setIsMoreMenuOpen((prev) => !prev);
-                setIsSpeedMenuOpen(false);
-                setIsVisualizerMenuOpen(false);
-              }}
-              aria-haspopup="menu"
-              aria-expanded={isMoreMenuOpen}
-              aria-label="Plus d'options"
-              title="Plus d'options"
-            >
-              <PlayerIcon name="more" />
-            </button>
-            {isMoreMenuOpen ? (
-              <div className="media-player-menu" role="menu">
-                <button type="button" role="menuitem" className="media-player-menu__item" onClick={openProperties}>
-                  <PlayerIcon name="info" />
-                  <span>Propriétés</span>
-                  <kbd>Ctrl+I</kbd>
-                </button>
-                <button type="button" role="menuitem" className="media-player-menu__item" onClick={openEqualizer}>
-                  <PlayerIcon name="equalizer" />
-                  <span>Égaliseur</span>
-                  <kbd>Ctrl+Maj+E</kbd>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="media-player-menu__item"
-                  onClick={() => setIsSpeedMenuOpen((prev) => !prev)}
-                  aria-expanded={isSpeedMenuOpen}
-                >
-                  <PlayerIcon name="speed" />
-                  <span>Vitesse ({playbackSpeed}x)</span>
-                  <span className={`media-player-menu__chevron ${isSpeedMenuOpen ? "open" : ""}`}>
-                    <PlayerIcon name="chevron" />
-                  </span>
-                </button>
-                {isSpeedMenuOpen ? (
-                  <div className="media-player-menu__speeds" role="group" aria-label="Vitesse de lecture">
-                    {PLAYBACK_SPEEDS.map((speed) => (
-                      <button
-                        key={speed}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={playbackSpeed === speed}
-                        className={`media-player-menu__speed ${playbackSpeed === speed ? "active" : ""}`}
-                        onClick={() => setPlaybackSpeed(speed)}
-                      >
-                        {speed === 1 ? "1x" : `${speed}x`}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="media-player-menu__item"
-                  onClick={() => setIsVisualizerMenuOpen((prev) => !prev)}
-                  aria-expanded={isVisualizerMenuOpen}
-                >
-                  <PlayerIcon name="equalizer" />
-                  <span>
-                    Visualisation ({VISUALIZER_MODES.find((entry) => entry.id === visualizerMode)?.label})
-                  </span>
-                  <span className={`media-player-menu__chevron ${isVisualizerMenuOpen ? "open" : ""}`}>
-                    <PlayerIcon name="chevron" />
-                  </span>
-                </button>
-                {isVisualizerMenuOpen ? (
-                  <div className="media-player-menu__viz" role="group" aria-label="Visualisation">
-                    <div className="media-player-menu__speeds" role="radiogroup" aria-label="Style de visualisation">
-                      {VISUALIZER_MODES.map((entry) => (
-                        <button
-                          key={entry.id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={visualizerMode === entry.id}
-                          className={`media-player-menu__speed ${visualizerMode === entry.id ? "active" : ""}`}
-                          onClick={() => updateSetting("playerVisualizer", entry.id)}
-                        >
-                          {entry.label}
-                        </button>
-                      ))}
-                    </div>
-                    {visualizerMode !== "off" ? (
-                      <>
-                        <p className="media-player-menu__label">Couleurs</p>
-                        <div className="media-player-menu__colors" role="radiogroup" aria-label="Couleurs de la visualisation">
-                          {VISUALIZER_COLORS.map((entry) => (
-                            <button
-                              key={entry.id}
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={settings.playerVisualizerColor === entry.id}
-                              className={`media-player-menu__color ${settings.playerVisualizerColor === entry.id ? "active" : ""}`}
-                              onClick={() => updateSetting("playerVisualizerColor", entry.id)}
-                            >
-                              <span
-                                className="media-player-menu__swatch"
-                                style={{
-                                  background: entry.colors
-                                    ? `linear-gradient(90deg, ${entry.colors.join(", ")})`
-                                    : entry.id === "custom"
-                                      ? settings.playerVisualizerCustomColor
-                                      : "linear-gradient(90deg, var(--neon-2), var(--neon-1), var(--neon-3))"
-                                }}
-                              />
-                              <span>{entry.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                        {settings.playerVisualizerColor === "custom" ? (
-                          <label className="media-player-menu__slider">
-                            <span>Couleur personnalisée</span>
-                            <input
-                              type="color"
-                              value={settings.playerVisualizerCustomColor}
-                              onChange={(event) => updateSetting("playerVisualizerCustomColor", event.target.value)}
-                            />
-                          </label>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
-                <button type="button" role="menuitem" className="media-player-menu__item" disabled title="Non disponible">
-                  <PlayerIcon name="cast" />
-                  <span>Diffuser sur un appareil</span>
-                  <kbd>Ctrl+K</kbd>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="media-player-menu__item"
-                  disabled={playingLibraryMedia?.type !== "video"}
-                  title={playingLibraryMedia?.type !== "video" ? "Disponible pour les vidéos" : undefined}
-                  onClick={() => setIsVideoSettingsOpen((prev) => !prev)}
-                  aria-expanded={isVideoSettingsOpen}
-                >
-                  <PlayerIcon name="video" />
-                  <span>Paramètres vidéo</span>
-                  <span className={`media-player-menu__chevron ${isVideoSettingsOpen ? "open" : ""}`}>
-                    <PlayerIcon name="chevron" />
-                  </span>
-                </button>
-                {isVideoSettingsOpen && playingLibraryMedia?.type === "video" ? (
-                  <div className="media-player-menu__sub" role="group" aria-label="Paramètres vidéo">
-                    {VIDEO_ADJUSTMENTS.map((adjustment) => (
-                      <label key={adjustment.id} className="media-player-menu__slider">
-                        <span>{adjustment.label} ({videoSettings[adjustment.id]}%)</span>
-                        <input
-                          type="range"
-                          min="50"
-                          max="150"
-                          step="5"
-                          value={videoSettings[adjustment.id]}
-                          onChange={(event) =>
-                            setVideoSettings((prev) => ({ ...prev, [adjustment.id]: Number(event.target.value) }))
-                          }
-                        />
-                      </label>
-                    ))}
-                    {VIDEO_FIT_MODES.map((mode) => (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={videoSettings.fit === mode.id}
-                        className="media-player-menu__item media-player-menu__item--sub"
-                        onClick={() => setVideoSettings((prev) => ({ ...prev, fit: mode.id }))}
-                      >
-                        <span className="media-player-menu__check">
-                          {videoSettings.fit === mode.id ? <PlayerIcon name="check" /> : null}
-                        </span>
-                        <span>{mode.label}</span>
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="media-player-menu__item media-player-menu__item--sub"
-                      onClick={() => setVideoSettings(DEFAULT_VIDEO_SETTINGS)}
-                    >
-                      <span />
-                      <span>Réinitialiser</span>
-                    </button>
-                  </div>
-                ) : null}
-                <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(-10)}>
-                  <PlayerIcon name="back10" />
-                  <span>Retour rapide de 10 secondes</span>
-                  <kbd>Ctrl+Gauche</kbd>
-                </button>
-                <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(30)}>
-                  <PlayerIcon name="forward30" />
-                  <span>Avance rapide de 30 secondes</span>
-                  <kbd>Ctrl+Droite</kbd>
-                </button>
-              </div>
-            ) : null}
-          </div>
+          {renderMoreMenu()}
         </div>
       </div>
     </section>
@@ -2823,8 +2912,8 @@ export default function App() {
         const scale = await appWindow.scaleFactor();
         savedWindowSizeRef.current = (await appWindow.innerSize()).toLogical(scale);
         setVideoDisplayMode("windowed");
-        await appWindow.setMinSize(new LogicalSize(320, 160));
-        await appWindow.setSize(new LogicalSize(460, 200));
+        await appWindow.setMinSize(new LogicalSize(320, 220));
+        await appWindow.setSize(new LogicalSize(460, 260));
         await appWindow.setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false);
       } else {
         await appWindow.setAlwaysOnTop(false);
@@ -3045,6 +3134,8 @@ export default function App() {
       setIsMoreMenuOpen(false);
       setIsSpeedMenuOpen(false);
       setIsVisualizerMenuOpen(false);
+      setIsVizColorOpen(false);
+      setIsVideoSettingsOpen(false);
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
@@ -3135,7 +3226,7 @@ export default function App() {
           <div className="window-controls">
             <button
               type="button"
-              className="window-btn settings"
+              className="window-btn"
               onMouseDown={stopDragPropagation}
               onClick={() => {
                 setActiveSettingsTab("updates");
@@ -3333,7 +3424,6 @@ export default function App() {
                       >
                       <header className="changelog__head">
                         <strong>Version {release.version}</strong>
-                        {release.version === APP_VERSION ? <span className="changelog__badge">Installée</span> : null}
                         {release.prerelease ? <span className="changelog__badge">Pré-version</span> : null}
                         {release.date ? (
                           <time dateTime={release.date}>{new Date(release.date).toLocaleDateString("fr-FR")}</time>
@@ -3778,6 +3868,18 @@ export default function App() {
             </button>
           </div>
 
+          {visualizerMode !== "off" && playingLibraryMedia?.type !== "video" ? (
+            <div className="media-mini-player__viz">
+              <AudioVisualizer
+                getAnalyser={engine.getAnalyser}
+                mode={visualizerMode}
+                isPlaying={isAudioPlaying}
+                colorTheme={settings.playerVisualizerColor}
+                customColor={settings.playerVisualizerCustomColor}
+              />
+            </div>
+          ) : null}
+
           <div className="media-mini-player__controls">
             <button type="button" className="media-player-btn" onClick={() => stepLibraryMedia(-1)} aria-label="Précédent" title="Précédent">
               <PlayerIcon name="prev" />
@@ -3800,6 +3902,7 @@ export default function App() {
             <div className="media-player-bar__track">
               <span style={{ width: `${audioPlayerProgress}%` }} />
             </div>
+            {renderMoreMenu()}
             <button
               type="button"
               className="media-player-btn"
@@ -4075,7 +4178,7 @@ export default function App() {
               {activeSettingsTab === "behaviors" ? (
                 <div className="settings-stack">
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Bouton « Réduire »</strong>
                         <small>Active une action personnalisée quand tu cliques sur Réduire.</small>
@@ -4090,7 +4193,7 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                     <div className="settings-radio-group" role="radiogroup" aria-label="Action Réduire">
                       <label className="settings-radio-option">
                         <input
@@ -4118,7 +4221,7 @@ export default function App() {
                   </section>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Bouton « Fermer »</strong>
                         <small>Active une action personnalisée quand tu cliques sur Fermer.</small>
@@ -4133,7 +4236,7 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                     <div className="settings-radio-group" role="radiogroup" aria-label="Action Fermer">
                       <label className="settings-radio-option">
                         <input
@@ -4161,7 +4264,7 @@ export default function App() {
                   </section>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Sauvegarder la taille de la fenêtre</strong>
                         <small>Conserve la taille actuelle pour les prochains lancements.</small>
@@ -4176,12 +4279,13 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                   </section>
                 </div>
               ) : activeSettingsTab === "appearance" ? (
                 <div className="settings-stack">
                   <CollapsibleBlock
+                    collapsible={false}
                     head={
                       <>
                       <h3>Thèmes</h3>
@@ -4211,8 +4315,8 @@ export default function App() {
               ) : activeSettingsTab === "player" ? (
                 <div className="settings-stack">
                   {[
-                    { kind: "music", title: "Emplacements de la bibliothèque musicale", empty: "Aucun dossier de musique." },
-                    { kind: "video", title: "Emplacements de la bibliothèque vidéo", empty: "Aucun dossier de vidéos." }
+                    { kind: "music", title: "Dossiers de la bibliothèque musicale", empty: "Aucun dossier de musique." },
+                    { kind: "video", title: "Dossiers de la bibliothèque vidéo", empty: "Aucun dossier de vidéos." }
                   ].map((group) => (
                     <section
                       className={`settings-block settings-collapsible ${collapsedLibraryCards[group.kind] ? "settings-collapsible--closed" : ""}`}
@@ -4337,7 +4441,7 @@ export default function App() {
                   </section>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Format 24 heures</strong>
                         <small>Appliqué aux dates de l'historique.</small>
@@ -4352,7 +4456,7 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                   </section>
                 </div>
               ) : activeSettingsTab === "download" ? (
@@ -4360,17 +4464,16 @@ export default function App() {
                   <CollapsibleBlock
                     head={
                       <>
-                      <h3>Emplacement par défaut</h3>
+                      <h3>Dossiers de téléchargement</h3>
                       <p>
-                        Si vide, le logiciel demandera le dossier quand tu cliques sur
-                        "Télécharger".
+                        Si vide, le dossier sera demandé à chaque téléchargement.
                       </p>
                       </>
                     }
                   >
 
                     <label className="settings-field">
-                      <span>Dossier par défaut</span>
+                      <span>Dossier musique</span>
                       <div className="settings-path-row">
                         <input
                           type="text"
@@ -4389,7 +4492,7 @@ export default function App() {
                     </label>
 
                     <label className="settings-field">
-                      <span>Dossier vidéo par défaut</span>
+                      <span>Dossier vidéo</span>
                       <div className="settings-path-row">
                         <input
                           type="text"
@@ -4411,8 +4514,8 @@ export default function App() {
                   <CollapsibleBlock
                     head={
                       <>
-                      <h3>Valeurs par défaut</h3>
-                      <p>Appliquées quand tu utilises le bouton dédié.</p>
+                      <h3>Format et qualité</h3>
+                      <p>Utilisés par défaut pour les nouveaux téléchargements.</p>
                       </>
                     }
                   >
@@ -4450,7 +4553,7 @@ export default function App() {
 
                     <div className="settings-actions-row">
                       <button type="button" className="settings-browse-btn" onClick={applyFormDefaultsFromSettings}>
-                        Appliquer à la file
+                        Appliquer maintenant
                       </button>
                       <button type="button" className="settings-secondary-btn" onClick={resetSettingsToDefault}>
                         Réinitialiser
@@ -4459,7 +4562,7 @@ export default function App() {
                                     </CollapsibleBlock>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Limiter la vitesse de téléchargement</strong>
                         <small>Définit la limite en kilooctets par seconde.</small>
@@ -4474,7 +4577,7 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
 
                     <label className="settings-field settings-field-inline" style={{ marginTop: 12 }}>
                       <span>Débit maximal</span>
@@ -4496,6 +4599,7 @@ export default function App() {
               ) : activeSettingsTab === "updates" ? (
                 <div className="settings-stack">
                   <CollapsibleBlock
+                    collapsible={false}
                     head={
                       <>
                       <h3>Version installée : {APP_VERSION}</h3>
@@ -4506,7 +4610,7 @@ export default function App() {
                                     </CollapsibleBlock>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Vérifier les mises à jour au démarrage</strong>
                         <small>Affiche une vérification automatique au lancement.</small>
@@ -4521,11 +4625,11 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                   </section>
 
                   <section className="settings-block">
-                    <label className="settings-toggle-row settings-toggle-row--head">
+                    <div className="settings-toggle-row settings-toggle-row--head">
                       <div className="settings-toggle-text">
                         <strong>Mises à jour automatiques de l'application</strong>
                         <small>Télécharge automatiquement les nouvelles versions ; l'installation reste à valider.</small>
@@ -4540,7 +4644,7 @@ export default function App() {
                           <span className="settings-switch-thumb" />
                         </span>
                       </span>
-                    </label>
+                    </div>
                   </section>
                 </div>
               ) : (

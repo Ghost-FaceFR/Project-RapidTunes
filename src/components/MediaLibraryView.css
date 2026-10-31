@@ -1820,3 +1820,26 @@
 .mlv-card__art--round .mlv-check {
   background: color-mix(in srgb, var(--theme-bg-1, #101010) 85%, transparent);
 }
+
+/* Barre d'actions et en-têtes de colonnes: ils restent fixes pendant que la liste défile */
+.mlv-toolbar,
+.mlv-selbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-sizing: border-box;
+  min-height: 40px;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--theme-bg-1, #101010);
+}
+
+.mlv-selbar {
+  padding: 4px 10px;
+  border-radius: 0;
+  background: var(--theme-bg-3, #1f1f1f);
+}
+
+.mlv-row--head {
+  top: 40px;
+}
