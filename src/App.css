@@ -6087,3 +6087,8 @@ body {
 .theme-gradient-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
+
+.settings-toggle-row .custom-select-box {
+  flex: 0 0 auto;
+  width: 210px;
+}

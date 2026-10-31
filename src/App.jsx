@@ -193,6 +193,11 @@ const INITIAL_FORM = {
 
 const APP_VERSION = packageInfo.version;
 
+// Mini lecteur: taille de départ, et bornes de redimensionnement.
+const MINI_PLAYER_SIZE = { width: 460, height: 260 };
+const MINI_PLAYER_MIN = { width: 340, height: 170 };
+const MINI_PLAYER_MAX = { width: 640, height: 360 };
+
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const DEFAULT_VIDEO_SETTINGS = { brightness: 100, contrast: 100, saturation: 100, fit: "contain" };
 const VIDEO_FIT_MODES = [
@@ -2726,6 +2731,20 @@ export default function App() {
                     <PlayerIcon name="chevron" />
                   </span>
                 </button>
+                {isMiniPlayer ? (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={settings.playerMiniAlwaysOnTop !== false}
+                      className="media-player-menu__item"
+                      onClick={() => updateSetting("playerMiniAlwaysOnTop", settings.playerMiniAlwaysOnTop === false)}
+                    >
+                      {checkMark(settings.playerMiniAlwaysOnTop !== false)}
+                      <span>Toujours au premier plan</span>
+                    </button>
+                  </>
+                ) : null}
                 <button type="button" role="menuitem" className="media-player-menu__item" onClick={() => seekBy(-10)}>
                   <PlayerIcon name="back10" />
                   <span>Retour rapide de 10 secondes</span>
@@ -2912,11 +2931,13 @@ export default function App() {
         const scale = await appWindow.scaleFactor();
         savedWindowSizeRef.current = (await appWindow.innerSize()).toLogical(scale);
         setVideoDisplayMode("windowed");
-        await appWindow.setMinSize(new LogicalSize(320, 220));
-        await appWindow.setSize(new LogicalSize(460, 260));
+        await appWindow.setMinSize(new LogicalSize(MINI_PLAYER_MIN.width, MINI_PLAYER_MIN.height));
+        await appWindow.setMaxSize(new LogicalSize(MINI_PLAYER_MAX.width, MINI_PLAYER_MAX.height));
+        await appWindow.setSize(new LogicalSize(MINI_PLAYER_SIZE.width, MINI_PLAYER_SIZE.height));
         await appWindow.setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false);
       } else {
         await appWindow.setAlwaysOnTop(false);
+        await appWindow.setMaxSize(null);
         await appWindow.setMinSize(new LogicalSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height));
         const previous = savedWindowSizeRef.current;
         await appWindow.setSize(
@@ -2931,6 +2952,13 @@ export default function App() {
     }
     setIsMiniPlayer(enteringMini);
   };
+
+  useEffect(() => {
+    if (!isMiniPlayer) return;
+    getCurrentWindow()
+      .setAlwaysOnTop(settings.playerMiniAlwaysOnTop !== false)
+      .catch(() => {});
+  }, [isMiniPlayer, settings.playerMiniAlwaysOnTop]);
 
   const seekBy = (deltaSeconds) => {
     if (playingDurationSeconds <= 0) return;

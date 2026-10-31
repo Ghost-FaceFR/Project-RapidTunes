@@ -5,6 +5,7 @@
 ### Nouveautés
 - Nouvelles visualisations audio, dont des effets hypnotiques.
 - Mini lecteur : visualisation et menu « Plus d'options ».
+- Mini lecteur : option « Toujours au premier plan » et taille limitée.
 
 ### Améliorations
 - Thèmes de couleurs appliqués à toute l'interface.
