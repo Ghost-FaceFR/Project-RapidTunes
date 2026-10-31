@@ -1,6 +1,6 @@
 [package]
 name = "rapidtunes"
-version = "0.2.9"
+version = "0.2.10"
 description = "Media downloader et converter"
 authors = ["RapidTunes Team"]
 edition = "2021"

@@ -41,10 +41,10 @@ body {
   background: transparent;
   overflow: hidden;
   border-radius: 8px;
-  --neon-1: color-mix(in srgb, var(--theme-accent-2, #969696) 68%, #71efff 32%);
-  --neon-2: color-mix(in srgb, var(--theme-accent, #7f7f7f) 72%, #8d63ff 28%);
-  --neon-3: color-mix(in srgb, var(--theme-text-1, #f1f1f1) 66%, var(--theme-accent-2, #969696) 34%);
-  --neon-glow: color-mix(in srgb, var(--theme-accent-2, #969696) 72%, var(--theme-accent-2) 28%);
+  --neon-1: var(--theme-accent-2);
+  --neon-2: var(--theme-accent);
+  --neon-3: color-mix(in srgb, var(--theme-text-1) 70%, var(--theme-accent-2) 30%);
+  --neon-glow: var(--theme-accent-2);
 }
 
 .window-frame {
@@ -760,7 +760,7 @@ body {
 .queue-overview-card {
   border-radius: 0;
   border: 0;
-  background: #121417;
+  background: var(--theme-bg-1);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -897,22 +897,6 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--theme-accent-2) 82%, transparent) color-mix(in srgb, var(--theme-bg-1) 55%, transparent);
-}
-
-.queue-section-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.queue-section-body::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--theme-bg-1) 55%, transparent);
-  border-radius: 999px;
-}
-
-.queue-section-body::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-accent-2) 86%, transparent) 0%, color-mix(in srgb, var(--theme-accent-2) 90%, transparent) 100%);
-  border-radius: 999px;
 }
 
 .queue-section--waiting.queue-section--empty .queue-section-body,
@@ -940,25 +924,9 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--theme-accent-2) 82%, transparent) color-mix(in srgb, var(--theme-bg-1) 55%, transparent);
   padding-right: 8px;
     padding-left: 8px;
 
-}
-
-.queue-secondary-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.queue-secondary-scroll::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--theme-bg-1) 55%, transparent);
-  border-radius: 999px;
-}
-
-.queue-secondary-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-accent-2) 86%, transparent) 0%, color-mix(in srgb, var(--theme-accent-2) 90%, transparent) 100%);
-  border-radius: 999px;
 }
 
 .queue-topheader {
@@ -1006,7 +974,7 @@ body {
 }
 
 .queue-topheader-meta strong {
-  color: #ececec;
+  color: var(--theme-text-1);
   font-size: 0.92rem;
   line-height: 1.1;
 }
@@ -2378,7 +2346,7 @@ body {
 
 .window-frame {
   border-color: var(--theme-bg-2);
-  background: var(--app-main-bg, linear-gradient(180deg, var(--theme-bg-0) 0%, #080808 100%));
+  background: var(--app-main-bg, linear-gradient(180deg, var(--theme-bg-0) 0%, var(--theme-bg-0) 100%));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
@@ -2550,7 +2518,7 @@ body {
 }
 
 .custom-select-option {
-  color: #ececec;
+  color: var(--theme-text-1);
 }
 
 .custom-select-option:hover {
@@ -2604,7 +2572,7 @@ body {
 .queue-item-status-neutral {
   border-color: color-mix(in srgb, var(--theme-accent) 72%, transparent);
   background: color-mix(in srgb, var(--theme-bg-4) 58%, transparent);
-  color: #ececec;
+  color: var(--theme-text-1);
 }
 
 .queue-head-separator,
@@ -3071,7 +3039,7 @@ body {
 }
 
 /* === Harmonisation panneaux <-> popup (focus backgrounds) === */
-:root {
+.app-root {
   --surface-header-bg: var(--theme-bg-2);
   --surface-header-overlay-top: rgba(255, 255, 255, 0.08);
   --surface-header-overlay-bottom: rgba(255, 255, 255, 0.02);
@@ -3272,7 +3240,7 @@ body {
 
 .titlebar-tab:hover,
 .titlebar-subtab:hover {
-  color: #ededed;
+  color: var(--theme-text-1);
 }
 
 .titlebar-tab.active,
@@ -3324,7 +3292,7 @@ body {
 .about-panel h2 {
   margin: 0;
   font-size: 0.94rem;
-  color: #f0f0f0;
+  color: var(--theme-text-1);
 }
 
 .media-library-panel__head p,
@@ -3353,7 +3321,7 @@ body {
 }
 
 .media-library-filter:hover {
-  color: #f0f0f0;
+  color: var(--theme-text-1);
 }
 
 .media-library-filter.active {
@@ -3406,7 +3374,7 @@ body {
 
 .media-library-card__meta strong {
   font-size: 0.78rem;
-  color: #f1f1f1;
+  color: var(--theme-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3462,7 +3430,7 @@ body {
 .media-library-sidebar h2 {
   margin: 0;
   font-size: 0.9rem;
-  color: #f2f2f2;
+  color: var(--theme-text-1);
 }
 
 .media-library-sidebar p {
@@ -3505,7 +3473,7 @@ body {
 }
 
 .media-library-sidebar-item:hover {
-  color: #efefef;
+  color: var(--theme-text-1);
 }
 
 .media-library-sidebar-item.active {
@@ -3546,7 +3514,7 @@ body {
 .media-library-main__head h3 {
   margin: 0;
   font-size: 0.88rem;
-  color: #f1f1f1;
+  color: var(--theme-text-1);
 }
 
 .media-library-main__head p {
@@ -3622,7 +3590,7 @@ body {
 
 .media-library-item__meta strong {
   font-size: 0.8rem;
-  color: #f1f1f1;
+  color: var(--theme-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3680,7 +3648,7 @@ body {
 
 .media-library-focus-panel__meta strong {
   font-size: 0.82rem;
-  color: #f2f2f2;
+  color: var(--theme-text-1);
 }
 
 .media-library-focus-panel__meta span {
@@ -3757,7 +3725,7 @@ body {
   bottom: -6px;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #45f5ff 0%, #8e68ff 55%, #ff68d0 100%);
+  background: linear-gradient(90deg, var(--neon-1) 0%, var(--neon-2) 55%, var(--neon-3) 100%);
   opacity: 0.24;
   transform: scaleX(0.72);
   transform-origin: center;
@@ -3766,7 +3734,7 @@ body {
 }
 
 .titlebar-tab:hover {
-  color: #f6f6f6;
+  color: var(--theme-text-1);
 }
 
 .titlebar-tab:hover::after {
@@ -3784,7 +3752,7 @@ body {
   transform: scaleX(1);
   box-shadow:
     0 0 12px color-mix(in srgb, var(--theme-accent-2) 50%, transparent),
-    0 0 18px rgba(164, 113, 255, 0.36);
+    0 0 18px color-mix(in srgb, var(--neon-2) 36%, transparent);
 }
 
 .titlebar-media-dl-menu {
@@ -3829,7 +3797,7 @@ body {
   bottom: -6px;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #45f5ff 0%, #8e68ff 55%, #ff68d0 100%);
+  background: linear-gradient(90deg, var(--neon-1) 0%, var(--neon-2) 55%, var(--neon-3) 100%);
   opacity: 0.45;
   transform: scaleX(0.8);
   transform-origin: center;
@@ -3851,7 +3819,7 @@ body {
   transform: scaleX(1);
   box-shadow:
     0 0 12px color-mix(in srgb, var(--theme-accent-2) 45%, transparent),
-    0 0 18px rgba(164, 113, 255, 0.34);
+    0 0 18px color-mix(in srgb, var(--neon-2) 34%, transparent);
 }
 
 .titlebar-media-dl-menu__panel {
@@ -3887,7 +3855,7 @@ body {
 
 .titlebar-media-dl-menu__item:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #f6f6f6;
+  color: var(--theme-text-1);
 }
 
 .titlebar-media-dl-menu__item.active {
@@ -3922,10 +3890,10 @@ body {
   bottom: 10px;
   width: 2px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #45f5ff 0%, #8e68ff 55%, #ff68d0 100%);
+  background: linear-gradient(180deg, var(--neon-1) 0%, var(--neon-2) 55%, var(--neon-3) 100%);
   box-shadow:
-    0 0 9px rgba(99, 218, 255, 0.45),
-    0 0 14px rgba(157, 112, 255, 0.34);
+    0 0 9px color-mix(in srgb, var(--neon-2) 45%, transparent),
+    0 0 14px color-mix(in srgb, var(--neon-2) 34%, transparent);
 }
 
 .media-library-sidebar-item {
@@ -4003,10 +3971,10 @@ body {
   bottom: 0.9rem;
   width: 2px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #45f5ff 0%, #8e68ff 55%, #ff68d0 100%);
+  background: linear-gradient(180deg, var(--neon-1) 0%, var(--neon-2) 55%, var(--neon-3) 100%);
   box-shadow:
-    0 0 9px rgba(99, 218, 255, 0.4),
-    0 0 14px rgba(157, 112, 255, 0.3);
+    0 0 9px color-mix(in srgb, var(--neon-2) 40%, transparent),
+    0 0 14px color-mix(in srgb, var(--neon-2) 30%, transparent);
 }
 
 @media (max-width: 980px) {
@@ -4489,7 +4457,7 @@ body {
 }
 
 /* ===== OVERRIDE FINAL: indicateurs unifiés (horizontal + vertical) ===== */
-:root {
+.app-root {
   --tab-indicator-vertical: color-mix(in srgb, var(--theme-line-3, #4a4a4a) 84%, #ffffff 16%);
   --tab-hover-bg: color-mix(in srgb, var(--theme-bg-4, #272727) 44%, transparent);
   --tab-neon-line: linear-gradient(90deg, var(--neon-1) 0%, var(--neon-2) 54%, var(--neon-3) 100%);
@@ -5587,7 +5555,6 @@ body {
 .media-player-menu {
   max-height: calc(100vh - 150px);
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .media-player-menu__viz {
@@ -5820,7 +5787,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  scrollbar-width: thin;
 }
 
 .about-col .about-list,
@@ -5857,7 +5823,7 @@ body {
   flex-direction: column;
   gap: 12px;
   background: var(--theme-bg-0);
-  color: #f1f1f1;
+  color: var(--theme-text-1);
 }
 
 .boot-error h1 {
@@ -5933,7 +5899,6 @@ body {
 /* ===== À propos: une seule colonne centrée (logo, infos, mise à jour, puis journal) ===== */
 .about-panel {
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .about-layout {
@@ -6091,4 +6056,136 @@ body {
 .settings-toggle-row .custom-select-box {
   flex: 0 0 auto;
   width: 210px;
+}
+
+/* Barres de défilement, curseurs et sélection: couleurs du thème */
+.app-root {
+  accent-color: var(--theme-accent-2);
+}
+
+.app-root ::selection {
+  background: color-mix(in srgb, var(--theme-accent) 55%, transparent);
+  color: var(--theme-text-1);
+}
+
+/* Barres de défilement 100 % CSS (WebKit), aux couleurs du thème, sans flèches */
+.app-root,
+.app-root * {
+  --scroll-size: 10px;
+}
+
+.app-root::-webkit-scrollbar,
+.app-root *::-webkit-scrollbar {
+  width: var(--scroll-size);
+  height: var(--scroll-size);
+  background: transparent;
+}
+
+.app-root::-webkit-scrollbar-track,
+.app-root *::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--theme-bg-0) 55%, transparent);
+  border-radius: 999px;
+}
+
+.app-root::-webkit-scrollbar-thumb,
+.app-root *::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  min-width: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-line-3) 90%, transparent);
+  background-clip: padding-box;
+}
+
+.app-root *::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--theme-accent-2) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.app-root *::-webkit-scrollbar-thumb:active {
+  background: var(--theme-accent-2);
+  background-clip: padding-box;
+}
+
+.app-root::-webkit-scrollbar-button,
+.app-root *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.app-root::-webkit-scrollbar-corner,
+.app-root *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ===== Media DL: mise en page ===== */
+/* La page ne défile plus: saisie et téléchargement actif restent visibles, seules les listes défilent. */
+.window-content {
+  overflow: hidden;
+}
+
+.converter-form--unified {
+  height: 100%;
+  min-height: 0;
+}
+
+.converter-form--unified .queue-overview-card {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* Format, qualité et bouton Télécharger sur une seule ligne */
+.converter-form--unified .form-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.converter-form--unified .form-grid .run-btn {
+  width: auto;
+  min-width: 160px;
+  height: 36px;
+  min-height: 36px;
+}
+
+/* Téléchargement actif plus compact */
+.queue-topheader-speed__graph {
+  height: 52px;
+}
+
+/* Historique: date sur la ligne des tags, message quand la liste est vide */
+.queue-history-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.queue-history-date-inline {
+  margin-left: auto;
+  color: var(--theme-text-3);
+  font-size: 0.7rem;
+}
+
+.queue-empty-hint {
+  margin: 4px 2px 8px;
+  color: var(--theme-text-3);
+  font-size: 0.78rem;
+}
+
+/* Mini lecteur: le menu Plus d options occupe la fenetre au-dessus de la barre du bas */
+.media-mini-player .media-player-menu-anchor {
+  position: static;
+}
+
+.media-mini-player .media-player-menu {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  bottom: 52px;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow-y: auto;
 }

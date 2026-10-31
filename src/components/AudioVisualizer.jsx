@@ -142,6 +142,33 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
       return bass;
     };
 
+    // Valeurs lissées (montée rapide, descente douce) pour des animations fluides.
+    const smoothed = {};
+    const sm = (key, value, up = 0.5, down = 0.15) => {
+      const previous = smoothed[key] ?? value;
+      const next = previous + (value - previous) * (value > previous ? up : down);
+      smoothed[key] = next;
+      return next;
+    };
+    const roundedRect = (x, y, w, h, r) => {
+      const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+      context.beginPath();
+      context.moveTo(x + radius, y);
+      context.lineTo(x + w - radius, y);
+      context.quadraticCurveTo(x + w, y, x + w, y + radius);
+      context.lineTo(x + w, y + h - radius);
+      context.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      context.lineTo(x + radius, y + h);
+      context.quadraticCurveTo(x, y + h, x, y + h - radius);
+      context.lineTo(x, y + radius);
+      context.quadraticCurveTo(x, y, x + radius, y);
+      context.closePath();
+    };
+    const shockwaves = [];
+    let beatCooldown = 0;
+    let lastBass = 0;
+    const TRAIL_MODES = new Set(["wave", "circle", "radial", "pulse"]);
+
     const FRAME_INTERVAL = 1000 / 30;
     let lastDraw = 0;
 
@@ -151,7 +178,15 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
       if (isPlaying) frame = requestAnimationFrame(draw);
       if (isPlaying && (document.hidden || now - lastDraw < FRAME_INTERVAL)) return;
       lastDraw = now;
-      context.clearRect(0, 0, width, height);
+      if (isPlaying && TRAIL_MODES.has(mode)) {
+        // Rémanence: on estompe l'image précédente au lieu de l'effacer.
+        context.globalCompositeOperation = "destination-out";
+        context.fillStyle = "rgba(0, 0, 0, 0.3)";
+        context.fillRect(0, 0, width, height);
+        context.globalCompositeOperation = "source-over";
+      } else {
+        context.clearRect(0, 0, width, height);
+      }
 
       const analyser = getAnalyser?.();
       if (analyser && (!frequencyData || frequencyData.length !== analyser.frequencyBinCount)) {
@@ -166,179 +201,357 @@ export default function AudioVisualizer({ getAnalyser, mode, isPlaying, colorThe
       phase += 0.02;
 
       if (mode === "bars") {
-        const count = Math.max(16, Math.min(64, Math.floor(width / 12)));
-        const usable = Math.floor((frequencyData?.length ?? 0) * 0.7);
-        const gap = 3;
-        const barWidth = Math.max(2, width / count - gap);
-        context.fillStyle = gradient;
+        // Barres arrondies avec halo, sommets qui retombent et reflet au sol.
+        const count = Math.max(16, Math.min(56, Math.floor(width / 14)));
+        const gap = 4;
+        const barWidth = Math.max(3, width / count - gap);
+        const floor = height * 0.8;
+        const maxBar = floor - 6;
+        updateBass(active);
         for (let i = 0; i < count; i += 1) {
-          let value = 0;
-          if (active && usable > 0) {
-            // Répartition logarithmique: plus de barres pour les graves.
-            const start = Math.floor(Math.pow(i / count, 2) * usable);
-            const end = Math.max(start + 1, Math.floor(Math.pow((i + 1) / count, 2) * usable));
-            let sum = 0;
-            for (let j = start; j < end; j += 1) sum += frequencyData[j];
-            value = sum / (end - start) / 255;
-          } else {
-            value = 0.03;
-          }
-          const barHeight = Math.max(2, value * height * 0.9);
+          const value = sm("bar" + i, active ? bandLevel(i, count) : 0.04, 0.6, 0.14);
+          const barHeight = Math.max(3, Math.pow(value, 0.85) * maxBar);
           const x = i * (barWidth + gap) + gap / 2;
-          context.fillRect(x, height - barHeight, barWidth, barHeight);
-          peaks[i] = Math.max(value * height * 0.9, (peaks[i] ?? 0) - 1.4);
-          context.fillRect(x, height - peaks[i] - 5, barWidth, 2);
+          const column = context.createLinearGradient(0, floor, 0, floor - barHeight);
+          column.addColorStop(0, colors.a);
+          column.addColorStop(0.6, colors.b);
+          column.addColorStop(1, colors.c);
+          context.shadowColor = colors.b;
+          context.shadowBlur = 10 + value * 14;
+          context.fillStyle = column;
+          roundedRect(x, floor - barHeight, barWidth, barHeight, Math.min(barWidth / 2, 5));
+          context.fill();
+          context.shadowBlur = 0;
+
+          peaks[i] = Math.max(barHeight, (peaks[i] ?? 0) - 1.6);
+          context.fillStyle = colors.c;
+          context.globalAlpha = 0.9;
+          roundedRect(x, floor - peaks[i] - 6, barWidth, 3, 1.5);
+          context.fill();
+
+          // Reflet
+          context.globalAlpha = 0.16;
+          const reflection = context.createLinearGradient(0, floor + 2, 0, floor + 2 + barHeight * 0.35);
+          reflection.addColorStop(0, colors.b);
+          reflection.addColorStop(1, "transparent");
+          context.fillStyle = reflection;
+          context.fillRect(x, floor + 2, barWidth, barHeight * 0.35);
+          context.globalAlpha = 1;
         }
       } else if (mode === "wave") {
-        context.lineWidth = 2.5;
-        context.strokeStyle = gradient;
-        context.shadowColor = colors.b;
-        context.shadowBlur = 6;
-        context.beginPath();
-        const points = 160;
+        // Trois couches d'onde lissées, avec halo et remplissage doux; la rémanence laisse une traînée.
+        const points = 120;
+        const mid = height / 2;
+        updateBass(active);
+        const samples = [];
         for (let i = 0; i <= points; i += 1) {
-          const x = (i / points) * width;
-          let y;
+          let sample;
           if (active && timeData) {
-            const sample = timeData[Math.floor((i / points) * (timeData.length - 1))] / 128 - 1;
-            y = height / 2 + sample * height * 0.42;
+            sample = timeData[Math.floor((i / points) * (timeData.length - 1))] / 128 - 1;
           } else {
-            y = height / 2 + Math.sin(i * 0.12 + phase) * 4;
+            sample = Math.sin(i * 0.12 + phase) * 0.04;
           }
-          if (i === 0) context.moveTo(x, y);
-          else context.lineTo(x, y);
+          samples.push(sm("wave" + i, sample, 0.55, 0.3));
         }
-        context.stroke();
+        const trace = (scale, offset) => {
+          context.beginPath();
+          for (let i = 0; i <= points; i += 1) {
+            const x = (i / points) * width;
+            const envelope = Math.sin((i / points) * Math.PI) * 0.6 + 0.4;
+            const y = mid + (samples[i] * height * 0.46 * scale + Math.sin(i * 0.2 + phase * 3 + offset) * 2) * envelope;
+            if (i === 0) context.moveTo(x, y);
+            else {
+              const px = ((i - 0.5) / points) * width;
+              context.quadraticCurveTo(px, y, x, y);
+            }
+          }
+        };
+        const horizontal = context.createLinearGradient(0, 0, width, 0);
+        horizontal.addColorStop(0, colors.a);
+        horizontal.addColorStop(0.5, colors.b);
+        horizontal.addColorStop(1, colors.c);
+        trace(1, 0);
+        context.lineTo(width, mid);
+        context.lineTo(0, mid);
+        context.closePath();
+        context.globalAlpha = 0.14;
+        context.fillStyle = horizontal;
+        context.fill();
+        [[1.0, 3, 0.95, 16], [0.7, 2, 0.5, 8], [0.45, 1.5, 0.3, 0]].forEach(([scale, line, alpha, blur], layer) => {
+          trace(scale, layer * 1.7);
+          context.globalAlpha = alpha;
+          context.lineWidth = line;
+          context.lineJoin = "round";
+          context.strokeStyle = horizontal;
+          context.shadowColor = colors.b;
+          context.shadowBlur = blur;
+          context.stroke();
+        });
         context.shadowBlur = 0;
+        context.globalAlpha = 1;
       } else if (mode === "circle") {
+        // Anneau de rayons dégradés qui tourne, avec points lumineux et pulsation sur les basses.
         const centerX = width / 2;
         const centerY = height / 2;
-        const baseRadius = Math.min(width, height) * 0.22;
-        const spokes = 72;
+        const b = updateBass(active);
+        const size = Math.min(width, height);
+        const baseRadius = size * (0.2 + b * 0.04);
+        const spokes = 84;
         const usable = Math.floor((frequencyData?.length ?? 0) * 0.6);
-        context.lineWidth = 3;
         context.lineCap = "round";
-        context.strokeStyle = colors.b;
+        const colorList = palette();
         for (let i = 0; i < spokes; i += 1) {
-          const angle = (i / spokes) * Math.PI * 2 + phase * 0.15;
-          let value = 0.03;
+          const angle = (i / spokes) * Math.PI * 2 + spin * 0.25;
+          let value = 0.04;
           if (active && usable > 0) {
             const mirrored = i < spokes / 2 ? i : spokes - 1 - i;
             value = frequencyData[Math.floor((mirrored / (spokes / 2)) * usable)] / 255;
           }
-          const length = value * Math.min(width, height) * 0.28 + 2;
+          value = sm("circ" + i, value, 0.6, 0.15);
+          const length = value * size * 0.3 + 3;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          const tone = colorList[Math.floor((i / spokes) * 3) % 3];
+          context.strokeStyle = tone;
+          context.shadowColor = tone;
+          context.shadowBlur = 8;
+          context.lineWidth = 2.5;
           context.beginPath();
-          context.moveTo(centerX + Math.cos(angle) * baseRadius, centerY + Math.sin(angle) * baseRadius);
-          context.lineTo(
-            centerX + Math.cos(angle) * (baseRadius + length),
-            centerY + Math.sin(angle) * (baseRadius + length)
-          );
+          context.moveTo(centerX + cos * baseRadius, centerY + sin * baseRadius);
+          context.lineTo(centerX + cos * (baseRadius + length), centerY + sin * (baseRadius + length));
           context.stroke();
+          context.shadowBlur = 0;
+          context.fillStyle = colors.c;
+          context.globalAlpha = 0.5 + value * 0.5;
+          context.beginPath();
+          context.arc(centerX + cos * (baseRadius + length + 5), centerY + sin * (baseRadius + length + 5), 1.4 + value * 1.6, 0, Math.PI * 2);
+          context.fill();
+          context.globalAlpha = 1;
         }
-        context.strokeStyle = colors.a;
-        context.lineWidth = 2;
+        const halo = context.createRadialGradient(centerX, centerY, baseRadius * 0.3, centerX, centerY, baseRadius);
+        halo.addColorStop(0, "transparent");
+        halo.addColorStop(1, colors.b);
+        context.globalAlpha = 0.18 + b * 0.25;
+        context.fillStyle = halo;
         context.beginPath();
-        context.arc(centerX, centerY, baseRadius - 4, 0, Math.PI * 2);
-        context.stroke();
-      } else if (mode === "mirror") {
-        const count = Math.max(16, Math.min(56, Math.floor(width / 14)));
-        const gap = 3;
-        const barWidth = Math.max(2, width / count - gap);
-        const mid = height / 2;
-        context.fillStyle = gradient;
-        for (let i = 0; i < count; i += 1) {
-          const value = active ? bandLevel(i, count) : 0.03;
-          const half = Math.max(1.5, value * height * 0.46);
-          const x = i * (barWidth + gap) + gap / 2;
-          context.fillRect(x, mid - half, barWidth, half * 2);
-        }
-      } else if (mode === "area") {
-        const points = 64;
-        context.beginPath();
-        context.moveTo(0, height);
-        for (let i = 0; i <= points; i += 1) {
-          const value = active ? bandLevel(Math.min(i, points - 1), points) : 0.03;
-          context.lineTo((i / points) * width, height - Math.max(2, value * height * 0.92));
-        }
-        context.lineTo(width, height);
-        context.closePath();
-        context.globalAlpha = 0.45;
-        context.fillStyle = gradient;
+        context.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
         context.fill();
         context.globalAlpha = 1;
+        context.strokeStyle = colors.a;
         context.lineWidth = 2;
-        context.strokeStyle = colors.c;
+        context.shadowColor = colors.a;
+        context.shadowBlur = 10;
+        context.beginPath();
+        context.arc(centerX, centerY, baseRadius - 3, 0, Math.PI * 2);
         context.stroke();
+        context.shadowBlur = 0;
+      } else if (mode === "mirror") {
+        // Barres symétriques qui partent du centre, dégradé horizontal et halo.
+        const count = Math.max(16, Math.min(56, Math.floor(width / 14)));
+        const gap = 3;
+        const barWidth = Math.max(3, width / count - gap);
+        const mid = height / 2;
+        updateBass(active);
+        const horizontal = context.createLinearGradient(0, 0, width, 0);
+        horizontal.addColorStop(0, colors.a);
+        horizontal.addColorStop(0.5, colors.c);
+        horizontal.addColorStop(1, colors.b);
+        context.fillStyle = horizontal;
+        context.shadowColor = colors.b;
+        context.shadowBlur = 12;
+        for (let i = 0; i < count; i += 1) {
+          const mirrored = i < count / 2 ? i : count - 1 - i;
+          const value = sm("mir" + i, active ? bandLevel(Math.min(mirrored * 2, count - 1), count) : 0.04, 0.6, 0.14);
+          const half = Math.max(2, Math.pow(value, 0.9) * height * 0.46);
+          const x = i * (barWidth + gap) + gap / 2;
+          roundedRect(x, mid - half, barWidth, half * 2, Math.min(barWidth / 2, 6));
+          context.fill();
+        }
+        context.shadowBlur = 0;
+        context.globalAlpha = 0.5;
+        context.fillStyle = colors.c;
+        context.fillRect(0, mid - 0.5, width, 1);
+        context.globalAlpha = 1;
+      } else if (mode === "area") {
+        // Trois nappes de spectre superposées, courbes lissées, avec ligne lumineuse.
+        const points = 56;
+        updateBass(active);
+        const layers = [
+          { shift: 0, scale: 1, alpha: 0.5 },
+          { shift: 6, scale: 0.78, alpha: 0.32 },
+          { shift: 12, scale: 0.55, alpha: 0.22 }
+        ];
+        layers.forEach((layer, index) => {
+          const values = [];
+          for (let i = 0; i <= points; i += 1) {
+            const base = active ? bandLevel(Math.min(i, points - 1), points) : 0.04;
+            values.push(sm("area" + index + "_" + i, base, 0.5, 0.12));
+          }
+          const y = (i) => height - 3 - Math.max(2, values[i] * height * 0.9 * layer.scale) - layer.shift * 0;
+          context.beginPath();
+          context.moveTo(0, height);
+          context.lineTo(0, y(0));
+          for (let i = 1; i <= points; i += 1) {
+            const x = (i / points) * width;
+            const px = ((i - 0.5) / points) * width;
+            context.quadraticCurveTo(px, y(i - 1), (px + x) / 2, (y(i - 1) + y(i)) / 2);
+          }
+          context.lineTo(width, y(points));
+          context.lineTo(width, height);
+          context.closePath();
+          const fill = context.createLinearGradient(0, 0, 0, height);
+          fill.addColorStop(0, index === 0 ? colors.c : colors.b);
+          fill.addColorStop(1, colors.a);
+          context.globalAlpha = layer.alpha;
+          context.fillStyle = fill;
+          context.fill();
+          if (index === 0) {
+            context.globalAlpha = 0.95;
+            context.lineWidth = 2;
+            context.strokeStyle = colors.c;
+            context.shadowColor = colors.c;
+            context.shadowBlur = 12;
+            context.stroke();
+            context.shadowBlur = 0;
+          }
+        });
+        context.globalAlpha = 1;
       } else if (mode === "dots") {
+        // Matrice de points: taille et éclat suivent le niveau, le plus haut brille.
         const columns = Math.max(12, Math.min(40, Math.floor(width / 16)));
         const cell = width / columns;
-        const radius = Math.max(1.5, Math.min(cell * 0.32, 5));
+        const radius = Math.max(1.6, Math.min(cell * 0.34, 5.5));
         const rows = Math.max(3, Math.floor(height / (radius * 3.2)));
         const rowStep = height / rows;
-        context.fillStyle = gradient;
+        updateBass(active);
+        const colorList = palette();
         for (let i = 0; i < columns; i += 1) {
-          const value = active ? bandLevel(i, columns) : 0.03;
+          const value = sm("dot" + i, active ? bandLevel(i, columns) : 0.04, 0.6, 0.15);
           const lit = Math.max(1, Math.round(value * rows));
-          for (let r = 0; r < lit; r += 1) {
-            context.globalAlpha = 0.45 + 0.55 * (r / rows);
-            context.beginPath();
-            context.arc(cell * (i + 0.5), height - rowStep * (r + 0.5), radius, 0, Math.PI * 2);
-            context.fill();
+          const tone = colorList[Math.floor((i / columns) * 3) % 3];
+          context.fillStyle = tone;
+          for (let r = 0; r < rows; r += 1) {
+            const cy = height - rowStep * (r + 0.5);
+            const cx = cell * (i + 0.5);
+            if (r < lit) {
+              const isTop = r === lit - 1;
+              context.globalAlpha = 0.4 + 0.6 * (r / rows);
+              context.shadowColor = tone;
+              context.shadowBlur = isTop ? 14 : 4;
+              context.beginPath();
+              context.arc(cx, cy, isTop ? radius * 1.25 : radius, 0, Math.PI * 2);
+              context.fill();
+            } else {
+              context.globalAlpha = 0.07;
+              context.shadowBlur = 0;
+              context.beginPath();
+              context.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
+              context.fill();
+            }
           }
         }
+        context.shadowBlur = 0;
         context.globalAlpha = 1;
       } else if (mode === "radial") {
+        // Fleur spectrale: deux formes lissées en contre-rotation, rayons et halo central.
         const centerX = width / 2;
         const centerY = height / 2;
-        const baseRadius = Math.min(width, height) * 0.2;
+        const size = Math.min(width, height);
+        const b = updateBass(active);
+        const baseRadius = size * (0.18 + b * 0.04);
         const points = 96;
-        context.beginPath();
-        for (let i = 0; i <= points; i += 1) {
-          const index = i % points;
-          const mirrored = index < points / 2 ? index : points - 1 - index;
-          const value = active ? bandLevel(mirrored, points / 2, 0.6) : 0.03;
-          const radius = baseRadius + value * Math.min(width, height) * 0.3;
-          const angle = (index / points) * Math.PI * 2 - Math.PI / 2 + phase * 0.1;
-          const x = centerX + Math.cos(angle) * radius;
-          const y = centerY + Math.sin(angle) * radius;
-          if (i === 0) context.moveTo(x, y);
-          else context.lineTo(x, y);
-        }
-        context.closePath();
-        context.globalAlpha = 0.3;
+        const shape = (reach, rotation, key) => {
+          context.beginPath();
+          for (let i = 0; i <= points; i += 1) {
+            const index = i % points;
+            const mirrored = index < points / 2 ? index : points - 1 - index;
+            const value = sm(key + index, active ? bandLevel(mirrored, points / 2, 0.6) : 0.04, 0.55, 0.14);
+            const radius = baseRadius + value * size * reach;
+            const angle = (index / points) * Math.PI * 2 - Math.PI / 2 + rotation;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            if (i === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
+          }
+          context.closePath();
+        };
+        shape(0.34, spin * 0.2, "radA");
+        context.globalAlpha = 0.22;
         context.fillStyle = colors.b;
         context.fill();
         context.globalAlpha = 1;
         context.lineWidth = 2;
-        context.strokeStyle = gradient;
+        context.lineJoin = "round";
+        const sweep = context.createLinearGradient(centerX - size / 2, 0, centerX + size / 2, 0);
+        sweep.addColorStop(0, colors.a);
+        sweep.addColorStop(0.5, colors.c);
+        sweep.addColorStop(1, colors.b);
+        context.strokeStyle = sweep;
+        context.shadowColor = colors.b;
+        context.shadowBlur = 14;
         context.stroke();
+        shape(0.2, -spin * 0.3, "radB");
+        context.globalAlpha = 0.14;
+        context.fillStyle = colors.c;
+        context.fill();
+        context.globalAlpha = 0.7;
+        context.lineWidth = 1.2;
+        context.strokeStyle = colors.c;
+        context.stroke();
+        context.shadowBlur = 0;
+        context.globalAlpha = 1;
+        const core = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius);
+        core.addColorStop(0, colors.c);
+        core.addColorStop(1, "transparent");
+        context.globalAlpha = 0.25 + b * 0.5;
+        context.fillStyle = core;
+        context.beginPath();
+        context.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
+        context.fill();
+        context.globalAlpha = 1;
       } else if (mode === "pulse") {
+        // Onde de choc: chaque coup de basse lance un anneau qui s'étend et s'estompe.
         const centerX = width / 2;
         const centerY = height / 2;
-        const maxRadius = Math.min(width, height) * 0.46;
-        let level = 0.04;
-        if (active) {
-          let sum = 0;
-          for (let i = 0; i < 8; i += 1) sum += bandLevel(i, 32);
-          level = sum / 8;
+        const maxRadius = Math.hypot(centerX, centerY) * 0.9;
+        const b = updateBass(active);
+        beatCooldown -= 1;
+        if (active && b > 0.55 && b > lastBass + 0.04 && beatCooldown <= 0) {
+          shockwaves.push({ r: 0, life: 1, power: b });
+          beatCooldown = 6;
         }
-        bass = Math.max(level, bass - 0.04);
-        const rings = 4;
-        for (let r = 0; r < rings; r += 1) {
-          const t = (r + 1) / rings;
-          const radius = maxRadius * t * (0.45 + 0.55 * bass) + Math.sin(phase * 2 + r) * 1.5;
-          context.globalAlpha = 0.25 + 0.75 * (1 - t) * (0.4 + bass);
-          context.lineWidth = 2 + (rings - r) * 0.8;
-          context.strokeStyle = r % 2 === 0 ? colors.b : colors.c;
+        lastBass = b;
+        if (shockwaves.length === 0 && !active) shockwaves.push({ r: 0, life: 1, power: 0.3 });
+        const colorList = palette();
+        for (let i = shockwaves.length - 1; i >= 0; i -= 1) {
+          const wave = shockwaves[i];
+          wave.r += 0.012 + wave.power * 0.01;
+          wave.life = 1 - wave.r;
+          if (wave.life <= 0) {
+            shockwaves.splice(i, 1);
+            continue;
+          }
+          context.globalAlpha = Math.max(0, wave.life) * 0.9;
+          context.lineWidth = 2 + wave.life * 6 * wave.power;
+          context.strokeStyle = colorList[i % 3];
+          context.shadowColor = colorList[i % 3];
+          context.shadowBlur = 14;
           context.beginPath();
-          context.arc(centerX, centerY, Math.max(1, radius), 0, Math.PI * 2);
+          context.arc(centerX, centerY, Math.max(1, wave.r * maxRadius), 0, Math.PI * 2);
           context.stroke();
         }
-        context.globalAlpha = 1;
-        context.fillStyle = colors.a;
+        context.shadowBlur = 0;
+        const orbRadius = Math.min(width, height) * (0.1 + b * 0.09);
+        const orb = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, orbRadius * 1.8);
+        orb.addColorStop(0, colors.c);
+        orb.addColorStop(0.45, colors.b);
+        orb.addColorStop(1, "transparent");
+        context.globalAlpha = 0.9;
+        context.fillStyle = orb;
         context.beginPath();
-        context.arc(centerX, centerY, Math.max(2, maxRadius * 0.12 * (0.6 + bass)), 0, Math.PI * 2);
+        context.arc(centerX, centerY, orbRadius * 1.8, 0, Math.PI * 2);
         context.fill();
+        context.globalAlpha = 1;
       } else if (mode === "hypno") {
         // Spirale hypnotique: bras tournants dont la vrille s'accentue avec les basses.
         const cx = width / 2;

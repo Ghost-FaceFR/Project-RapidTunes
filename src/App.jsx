@@ -172,6 +172,7 @@ const DEFAULT_SETTINGS = {
   libraryIncludeSubfolders: true,
   playerAutoplayNext: true,
   playerMiniAlwaysOnTop: true,
+  playerVideoAutoFullscreen: true,
   playerShowCovers: true,
   playerVisualizer: "bars",
   playerVisualizerColor: "theme",
@@ -1124,6 +1125,27 @@ export default function App() {
     playingLibraryMedia.type === "video" &&
     selectedLibraryMedia?.id === playingLibraryMedia.id &&
     !isPlayerFullscreen;
+
+  // Une vidéo qui démarre s'ouvre en plein écran (désactivable), sinon elle reste dans l'aperçu du panneau.
+  useEffect(() => {
+    if (!playingLibraryMediaId || playingLibraryMedia?.type !== "video") return;
+    if (settings.playerVideoAutoFullscreen === false || isMiniPlayerRef.current) return;
+    if (activeTopTab !== "media-player") return;
+    setVideoDisplayMode("fullscreen");
+  }, [playingLibraryMediaId]);
+
+  // Une vidéo qui n'est affichée nulle part (ni plein écran, ni aperçu du panneau) est mise en pause.
+  const isVideoVisible = isPlayerFullscreen || (isVideoEngineInPanel && Boolean(panelHostNode));
+  const isVideoVisibleRef = useRef(isVideoVisible);
+  isVideoVisibleRef.current = isVideoVisible;
+  useEffect(() => {
+    if (playingLibraryMedia?.type !== "video" || isVideoVisible) return undefined;
+    // Court délai: au démarrage, le plein écran ou le panneau n'est pas encore monté.
+    const timer = setTimeout(() => {
+      if (!isVideoVisibleRef.current) engine.pause();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isVideoVisible, playingLibraryMediaId]);
 
   const mediaLibraryStats = useMemo(() => {
     const inLibrary = libraryItems.filter((item) => !item.session);
@@ -2109,7 +2131,6 @@ export default function App() {
   const historyDateLocale = LANGUAGE_OPTIONS.some((entry) => entry.value === settings.languageLocale)
     ? settings.languageLocale
     : "fr-FR";
-  const queueDockWaitingCountText = `File d’attente : ${waitingQueueItems.length}`;
   const activeSettingsEntry = SETTINGS_MENU.find((entry) => entry.id === activeSettingsTab);
   const settingsPanelTitle = activeSettingsEntry?.label ?? "Paramètres";
   const settingsPanelDescription =
@@ -2786,15 +2807,13 @@ export default function App() {
 
       <div className="media-player-bar__row">
         <div className="media-player-bar__meta">
-          {!isFullscreen ? (
-            <div className="media-player-bar__thumb" aria-hidden="true">
-              {playingLibraryMedia?.thumbnailUrl ? (
-                <img src={playingLibraryMedia.thumbnailUrl} alt="" />
-              ) : (
-                <img src={playingLibraryMedia?.type === "video" ? playIcon : musicIcon} alt="" />
-              )}
-            </div>
-          ) : null}
+          <div className="media-player-bar__thumb" aria-hidden="true">
+            {playingLibraryMedia?.thumbnailUrl ? (
+              <img src={playingLibraryMedia.thumbnailUrl} alt="" />
+            ) : (
+              <img src={playingLibraryMedia?.type === "video" ? playIcon : musicIcon} alt="" />
+            )}
+          </div>
           <div className="media-player-bar__text">
             <strong>{playingLibraryMedia?.title ?? "Aucun titre"}</strong>
             <span>
@@ -3354,18 +3373,18 @@ export default function App() {
                   />
                 )}
               </div>
-            </div>
 
-            <button
-              type="submit"
-              className="run-btn"
-              disabled={!canSubmitDownload}
-            >
-              <span className="run-btn__content">
-                <img src={downloadIcon} alt="" className="run-btn__icon" />
-                <span>Télécharger</span>
-              </span>
-            </button>
+              <button
+                type="submit"
+                className="run-btn"
+                disabled={!canSubmitDownload}
+              >
+                <span className="run-btn__content">
+                  <img src={downloadIcon} alt="" className="run-btn__icon" />
+                  <span>Télécharger</span>
+                </span>
+              </button>
+            </div>
 
               </>
             ) : null}
@@ -3621,7 +3640,8 @@ export default function App() {
                 </section>
 
                 <div className="queue-secondary-scroll">
-                <section className={`queue-section queue-section--waiting ${hasWaitingQueueContent ? "queue-section--filled" : "queue-section--empty"}`}>
+                {hasWaitingQueueContent ? (
+                <section className="queue-section queue-section--waiting queue-section--filled">
                 <div className="queue-overview-head queue-overview-head--sub">
                   <div className="queue-head-title-with-badge">
                     <strong>À venir</strong>
@@ -3747,6 +3767,7 @@ export default function App() {
                 ) : null}
                 </div>
                 </section>
+                ) : null}
 
                 <section className={`queue-section queue-section--history ${hasHistoryQueueContent ? "queue-section--filled" : "queue-section--empty"}`}>
                 <div className="queue-overview-head queue-overview-head--sub">
@@ -3767,6 +3788,10 @@ export default function App() {
                     </button>
                   )}
                 </div>
+
+                {!hasHistoryQueueContent ? (
+                  <p className="queue-empty-hint">Aucun téléchargement terminé pour le moment.</p>
+                ) : null}
 
                 <div className="queue-section-body">
 
@@ -3809,6 +3834,7 @@ export default function App() {
                                   <div className="preview-tags queue-history-tags" role="list" aria-label="Détails du média">
                                     <span role="listitem">{item.form.format.toUpperCase()}</span>
                                     <span role="listitem">{formatQualityDisplayValue(item.form.format, item.form.quality)}</span>
+                                    {historyDate ? <time className="queue-history-date-inline">{historyDate}</time> : null}
                                   </div>
                                 ) : null}
                               </div>
@@ -3837,11 +3863,6 @@ export default function App() {
                             </button>
                           </div>
                         </div>
-                        {historyDate ? (
-                          <div className="queue-history-footer">
-                            <p className="queue-history-date">{historyDate}</p>
-                          </div>
-                        ) : null}
                       </li>
                       );
                     })}
@@ -3860,22 +3881,6 @@ export default function App() {
 
         {activeTopTab === "media-player" ? (
           shouldRenderPlayerBar && !isPlayerFullscreen ? renderPlayerBar(false) : null
-        ) : activeTopTab === "media-dl" ? (
-          <footer className="dl-statusbar">
-            <button
-              type="button"
-              className="dl-statusbar__add"
-              onClick={() => document.querySelector(".url-input")?.focus()}
-            >
-              <span aria-hidden="true">+</span>
-              Ajouter un média
-            </button>
-            <span className="dl-statusbar__info">
-              Téléchargements terminés : {queueItems.filter((item) => item.status === "success").length} sur{" "}
-              {queueItems.filter((item) => item.status !== "cancelled").length}
-            </span>
-            <span className="dl-statusbar__info">{queueDockWaitingCountText}</span>
-          </footer>
         ) : null}
       </section>
 
@@ -3966,13 +3971,6 @@ export default function App() {
                     />
                   </div>
                 ) : null}
-              <div className="media-fs-player__art" aria-hidden="true">
-                {playingLibraryMedia.thumbnailUrl ? (
-                  <img src={playingLibraryMedia.thumbnailUrl} alt="" />
-                ) : (
-                  <img src={musicAlbumIcon} alt="" />
-                )}
-              </div>
               </>
             )}
           </div>
@@ -4430,6 +4428,11 @@ export default function App() {
                     "playerMiniAlwaysOnTop",
                     "Mini lecteur toujours au premier plan",
                     "Garde le mini lecteur au-dessus des autres fenêtres."
+                  )}
+                  {renderSettingToggle(
+                    "playerVideoAutoFullscreen",
+                    "Lire les vidéos en plein écran",
+                    "Ouvre automatiquement le plein écran quand une vidéo démarre, sinon elle reste dans l'aperçu."
                   )}
                   {renderSettingToggle(
                     "playerShowCovers",

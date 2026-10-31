@@ -1843,3 +1843,13 @@
 .mlv-row--head {
   top: 40px;
 }
+
+/* Rien ne doit apparaitre au-dessus de la barre fixe pendant le defilement */
+.mlv-scroll {
+  padding-top: 0;
+}
+
+.mlv-toolbar,
+.mlv-selbar {
+  box-shadow: 0 -8px 0 0 var(--theme-bg-1, #101010);
+}

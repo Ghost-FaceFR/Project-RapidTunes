@@ -1,5 +1,20 @@
 # Journal des modifications
 
+## 0.2.10 - 31 octobre 2026
+
+### Nouveautés
+- Les vidéos s'ouvrent en plein écran au démarrage (désactivable dans les paramètres).
+
+### Améliorations
+- Visualisations audio plus belles et plus fluides.
+- Thèmes de couleurs appliqués partout, y compris les barres de défilement.
+- Media DL réorganisé.
+- Mini lecteur : menu « Plus d'options » corrigé.
+- Plein écran : pochette dans la barre du bas.
+
+### Corrections
+- Bibliothèque : la liste ne déborde plus au-dessus des barres fixes.
+
 ## 0.2.9 - 31 octobre 2026
 
 ### Nouveautés
